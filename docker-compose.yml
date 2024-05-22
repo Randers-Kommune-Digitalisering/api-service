@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  app:
+    build: src
+    read_only: true
+    networks:
+      - app_network
+    ports:
+      - "8080:8080"
+    environment:
+      DEBUG: True
+      DB_USER: user
+      DB_PASS: pass
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: demo
+
+    # Add a volumne if there is a need to write files
+    # volumes:
+    #     - ./<local dir>:<container dir full path> E.g. /mydir/myfiles
+
+  #   depends_on: 
+  #     db:
+  #       condition: service_healthy
+
+  # db:
+  #   image: postgres:16.1
+  #   restart: always
+  #   #user: postgres
+  #   # Open ports for testing
+  #   ports:
+  #     - 5432:5432
+  #   environment:
+  #     POSTGRES_PASSWORD: pass
+  #     POSTGRES_USER: user
+  #     POSTGRES_DB: demo
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "pg_isready -q -U user -d demo" ]
+  #     start_period: 5s
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 55
+  #   networks:
+  #     - app_network
+
+networks: 
+  app_network:
+    name: app_network
