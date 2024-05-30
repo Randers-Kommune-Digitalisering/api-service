@@ -14,3 +14,8 @@ POD_NAME = os.getenv('POD_NAME', 'Pod name not set')
 # DB_HOST = os.environ["DB_HOST"]
 # DB_PORT = os.environ["DB_PORT"]
 # DB_DATABASE = os.environ["DB_DATABASE"]
+
+# NEXUS
+NEXUS_URL = os.environ["NEXUS_URL"].strip()
+NEXUS_CLIENT_ID = os.environ["NEXUS_CLIENT_ID"].strip()
+NEXUS_CLIENT_SECRET = os.environ["NEXUS_CLIENT_SECRET"].strip()
