@@ -1,0 +1,74 @@
+{
+    "graphQueries": [
+        {
+            "parameterMap": {
+                "admUuid": "<uuid>"
+            },
+            "computeAvailablePages": false,
+            "graphQuery": {
+                "structure": {
+                    "alias": "adminUnit",
+                    "userKey": "APOS-Types-AdministrativeUnit",
+                    "relations": [
+                        {
+                            "alias": "eng",
+                            "userKey": "APOS-Types-Engagement-TypeRelation-AdmUnit",
+                            "typeUserKey": "APOS-Types-Engagement",
+                            "direction": "IN"
+                        }
+                    ]
+                },
+                "parameters": [
+                    {
+                        "key": "admUuid",
+                        "name": "Admin Org uuid"
+                    }
+                ],
+                "criteria": {
+                    "type": "AND",
+                    "criteria": [
+                        {
+                            "type": "EXIST",
+                            "alias": "adminUnit.eng"
+                        },
+                        {
+                            "type": "MATCH",
+                            "operator": "EQUAL",
+                            "left": {
+                                "source": "DEFINITION",
+                                "alias": "adminUnit.$uuid"
+                            },
+                            "right": {
+                                "source": "PARAMETER",
+                                "key": "admUuid"
+                            }
+                        },
+                        {
+                            "type": "MATCH",
+                            "operator": "EQUAL",
+                            "left": {
+                                "source": "DEFINITION",
+                                "alias": "adminUnit.$state"
+                            },
+                            "right": {
+                                "source": "STATIC",
+                                "value": "STATE_ACTIVE"
+                            }
+                        }
+                    ]
+                },
+                "projection": {
+                    "identity": true,
+                    "state": true,
+                    "children": {
+                        "identity": true,
+                        "state": true
+                    }
+                }
+            },
+            "validDate": "NOW",
+            "offset": 0,
+            "limit": 1
+        }
+    ]
+}

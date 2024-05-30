@@ -39,4 +39,7 @@ app = create_app()
 
 if __name__ == "__main__":  # pragma: no cover
     # scheduler.start()
-    app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    #app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    import time
+    #time.tzset()
+    print(time.strftime('%Z'))
