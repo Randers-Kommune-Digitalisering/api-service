@@ -131,7 +131,7 @@ class DeltaClient:
     def get_adm_unit_list(self):
         if not self.adm_unit_list:
             if self.last_adm_unit_list_updated:
-                if (datetime.now() - self.last_adm_unit_list_updated).days > 1:                   
+                if (datetime.now() - self.last_adm_unit_list_updated).days > 1:
                     try:
                         start = time.time()
                         temp_adm_unit_list = []
