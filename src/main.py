@@ -40,6 +40,7 @@ app = create_app()
 #         return ok
 #     return 'failed', 500
 
+
 @app.route('/test-home-resource', methods=['GET'])
 def test_home_resource_route():
     print("Test resource")
@@ -49,6 +50,7 @@ def test_home_resource_route():
     except Exception as e:
         app.logger.error(f"Error fetching home resource: {e}")
         return str(e), 500
+
 
 def test_home_resource():
     try:
@@ -60,6 +62,5 @@ def test_home_resource():
 
 if __name__ == "__main__":  # pragma: no cover
     # scheduler.start()
-    app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
-    # test_home_resource()
-
+    # app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    test_home_resource()

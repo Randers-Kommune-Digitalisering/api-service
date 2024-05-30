@@ -1,4 +1,6 @@
-import requests, time, logging
+import logging
+import requests
+import time
 
 from .config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
 
@@ -112,7 +114,7 @@ class APIClient:
 # Nexus client requests
 class NEXUSClient:
     def __init__(self):
-        self.api_client = APIClient(NEXUS_URL,  NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
+        self.api_client = APIClient(NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
 
     # Home resource
     def home_resource(self):
