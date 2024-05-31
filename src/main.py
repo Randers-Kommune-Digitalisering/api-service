@@ -24,4 +24,4 @@ if __name__ == "__main__":  # pragma: no cover
     from delta import DeltaClient
     from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID
     dc = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_PASS, base_url=DELTA_BASE_URL, top_adm_unit_uuid=DELTA_TOP_ADM_UNIT_UUID)
-    print(cd.get_adm_unit_list()) #NB: takes almost 5 minutes to run
+    print(dc.get_adm_unit_list()) #NB: takes almost 5 minutes to run
