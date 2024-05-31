@@ -2,6 +2,7 @@ import os
 import time
 import base64
 import logging
+import threading
 import requests_pkcs12
 
 from datetime import datetime, timedelta
@@ -127,22 +128,37 @@ class DeltaClient:
                     return
         return adm_unit_list_with_employees
 
-    # returns a list of dictionaries with the admin unit UUID as the key and a list of team(sub admin units) UUIDs as the value
+    def _get_adm_unit_list(self):
+        try:
+            start = time.time()
+            temp_adm_unit_list = []
+            payload_children = self._get_payload('adm_unit_children')
+            self._recursive_get_adm_units(temp_adm_unit_list, payload_children, self.top_adm_unit_uuid)
+            payload_employees = self._get_payload('adm_unit_with_employees_teams')
+            adm_unit_list = self._check_has_employees_and_add_teams(temp_adm_unit_list, payload_employees)
+            logger.info('Updated admin unit list, time for update: ', str(timedelta(seconds=time.time() - start)))
+            return adm_unit_list
+        except Exception as e:
+            logger.error(f'Error getting ADM unit list: {e}')
+            return
+
+    def _update_adm_unit_list_background(self):
+        def thread_job():
+            self.adm_unit_list = self._get_adm_unit_list()
+            self.last_adm_unit_list_updated = datetime.now()
+
+        thread = threading.Thread(target=thread_job)
+        thread.start()
+
+    # returns a list of dictionaries with the admin unit UUID as the key and a list of team (sub admin units) UUIDs as the value
     def get_adm_unit_list(self):
         if not self.adm_unit_list:
+            self.adm_unit_list = self._get_adm_unit_list()
+            self.last_adm_unit_list_updated = datetime.now()
+        else:
             if self.last_adm_unit_list_updated:
-                if (datetime.now() - self.last_adm_unit_list_updated).days > 1:
-                    try:
-                        start = time.time()
-                        temp_adm_unit_list = []
-                        payload_children = self._get_payload('adm_unit_children')
-                        self._recursive_get_adm_units(temp_adm_unit_list, payload_children, self.top_adm_unit_uuid)
-                        payload_employees = self._get_payload('adm_unit_with_employees_teams')
-                        adm_unit_list = self._check_has_employees_and_add_teams(temp_adm_unit_list, payload_employees)
-                        logger.info('Updated admin unit list, time for update: ', str(timedelta(seconds=time.time() - start)))
-                        self.adm_unit_list = adm_unit_list
-                        self.last_adm_unit_list_updated = datetime.now()
-                    except Exception as e:
-                        logger.error(f'Error getting ADM unit list: {e}')
-                        return
+                if (datetime.now() - self.last_adm_unit_list_updated).total_seconds() > 4 * 60 * 60:
+                    self._update_adm_unit_list_background()
+            else:
+                self._update_adm_unit_list_background()
         return self.adm_unit_list
