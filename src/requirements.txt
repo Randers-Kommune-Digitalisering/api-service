@@ -4,5 +4,3 @@ prometheus-client==0.20.0
 python-dotenv==1.0.1
 requests==2.31.0 # requests-pkcs12 breaks with requests 2.32.*
 requests-pkcs12
-# psycopg2==2.9.9 # Package for database
-# apscheduler==3.10.4
