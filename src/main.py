@@ -1,13 +1,10 @@
 from flask import Flask, jsonify
 from healthcheck import HealthCheck
 from prometheus_client import generate_latest
-# from apscheduler.schedulers.background import BackgroundScheduler
 
 from utils.logging import set_logging_configuration, APP_RUNNING
 from utils.config import DEBUG, PORT, POD_NAME
 from utils.nexus_token import NEXUSClient
-# from background_job import test_job
-# from database import test_database
 
 # Create an instance of NEXUSClient
 nexus_client = NEXUSClient()
@@ -21,24 +18,9 @@ def create_app():
     APP_RUNNING.labels(POD_NAME).set(1)
     return app
 
-# def create_scheduler():
-#     scheduler = BackgroundScheduler()
-#     scheduler.add_job(test_job, 'interval', seconds=5) # Every 5 seconds
-#     scheduler.add_job(test_job, 'cron', day_of_week='mon', hour=7) # Every Monday at 7 AM
-#     return scheduler
-
 
 set_logging_configuration()
-# scheduler = create_scheduler()
 app = create_app()
-
-# @app.route('/test-database', methods=['GET'])
-# def test_database():
-#     ok = test_database()
-#     if ok:
-#         app.logger.info('Database ok')
-#         return ok
-#     return 'failed', 500
 
 
 @app.route('/test-home-resource', methods=['GET'])
@@ -61,6 +43,9 @@ def test_home_resource():
 
 
 if __name__ == "__main__":  # pragma: no cover
-    # scheduler.start()
     app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    # from delta import DeltaClient
+    # from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID
+    # dc = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_PASS, base_url=DELTA_BASE_URL, top_adm_unit_uuid=DELTA_TOP_ADM_UNIT_UUID)
+    # print(dc.get_adm_unit_list()) #NB: takes almost 5 minutes to run
     # test_home_resource()
