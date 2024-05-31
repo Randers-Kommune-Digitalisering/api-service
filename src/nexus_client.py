@@ -86,7 +86,11 @@ class APIClient:
 
     def _make_request(self, method, path, **kwargs):
         token = self.get_access_token()
-        url = f"{self.nexus_url}/{path}"
+        # Check if the path is a full URL
+        if path.startswith("http://") or path.startswith("https://"):
+            url = path
+        else:
+            url = f"{self.nexus_url}/{path}"
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
@@ -117,7 +121,6 @@ class NEXUSClient:
     def __init__(self):
         self.api_client = APIClient(NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
 
-    # Home resource
     def home_resource(self):
         path = "api/core/mobile/randers/v2/"
         return self.api_client.get(path)
@@ -129,11 +132,11 @@ class NEXUSClient:
     def get_request(self, path):
         return self.api_client.get(path)
 
-    def post_request(self, path):
-        return self.api_client.post(path)
+    def post_request(self, path, json):
+        return self.api_client.post(path, data=json)
 
-    def put_request(self, path):
-        return self.api_client.put(path)
+    def put_request(self, path, json):
+        return self.api_client.put(path, data=json)
 
     def delete_request(self, path):
         return self.api_client.delete(path)
