@@ -1,12 +1,16 @@
-from flask import Flask
+from flask import Flask, jsonify
 from healthcheck import HealthCheck
 from prometheus_client import generate_latest
 # from apscheduler.schedulers.background import BackgroundScheduler
 
 from utils.logging import set_logging_configuration, APP_RUNNING
 from utils.config import DEBUG, PORT, POD_NAME
+from utils.nexus_token import NEXUSClient
 # from background_job import test_job
 # from database import test_database
+
+# Create an instance of NEXUSClient
+nexus_client = NEXUSClient()
 
 
 def create_app():
@@ -37,6 +41,26 @@ app = create_app()
 #     return 'failed', 500
 
 
+@app.route('/test-home-resource', methods=['GET'])
+def test_home_resource_route():
+    print("Test resource")
+    try:
+        response = nexus_client.home_resource()
+        return jsonify(response), 200
+    except Exception as e:
+        app.logger.error(f"Error fetching home resource: {e}")
+        return str(e), 500
+
+
+def test_home_resource():
+    try:
+        response = nexus_client.home_resource()
+        return jsonify(response)
+    except Exception as e:
+        return str(e)
+
+
 if __name__ == "__main__":  # pragma: no cover
     # scheduler.start()
     app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    # test_home_resource()
