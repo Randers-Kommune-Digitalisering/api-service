@@ -5,7 +5,7 @@ from prometheus_client import generate_latest
 
 from utils.logging import set_logging_configuration, APP_RUNNING
 from utils.config import DEBUG, PORT, POD_NAME
-from utils.nexus_token import NEXUSClient
+from nexus_client import NEXUSClient
 # from background_job import test_job
 # from database import test_database
 
@@ -55,6 +55,7 @@ def test_home_resource_route():
 def test_home_resource():
     try:
         response = nexus_client.home_resource()
+        print(response)
         return jsonify(response)
     except Exception as e:
         return str(e)
@@ -62,5 +63,5 @@ def test_home_resource():
 
 if __name__ == "__main__":  # pragma: no cover
     # scheduler.start()
-    app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
-    # test_home_resource()
+    # app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    test_home_resource()

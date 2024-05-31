@@ -1,8 +1,9 @@
 import logging
-import requests
 import time
+import requests
 
-from .config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
+
+from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -120,3 +121,19 @@ class NEXUSClient:
     def home_resource(self):
         path = "api/core/mobile/randers/v2/"
         return self.api_client.get(path)
+
+    def find_professional_by_query(self, query):
+        path = "api/core/mobile/randers/v2/professionals/?query=" + query
+        return self.api_client.get(path)
+
+    def get_request(self, path):
+        return self.api_client.get(path)
+
+    def post_request(self, path):
+        return self.api_client.post(path)
+
+    def put_request(self, path):
+        return self.api_client.put(path)
+
+    def delete_request(self, path):
+        return self.api_client.delete(path)
