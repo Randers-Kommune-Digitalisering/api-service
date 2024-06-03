@@ -5,7 +5,7 @@ import logging
 import threading
 import requests_pkcs12
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ class DeltaClient:
             self._recursive_get_adm_units(temp_adm_unit_list, payload_children, self.top_adm_unit_uuid)
             payload_employees = self._get_payload('adm_unit_with_employees_teams')
             adm_unit_list = self._check_has_employees_and_add_teams(temp_adm_unit_list, payload_employees)
-            logger.info('Updated admin unit list, time for update: ', str(timedelta(seconds=time.time() - start)))
+            logger.info('Updated admin unit list, time for update: ' + str(timedelta(seconds=time.time() - start)))
             return adm_unit_list
         except Exception as e:
             logger.error(f'Error getting ADM unit list: {e}')
@@ -150,7 +150,7 @@ class DeltaClient:
         thread = threading.Thread(target=thread_job)
         thread.start()
 
-    # returns a list of dictionaries with the admin unit UUID as the key and a list of team (sub admin units) UUIDs as the value
+    # Returns a list of dictionaries with the admin unit UUID as the key and a list of team (sub admin units) UUIDs as the value
     def get_adm_unit_list(self):
         if not self.adm_unit_list:
             self.adm_unit_list = self._get_adm_unit_list()
@@ -162,3 +162,52 @@ class DeltaClient:
             else:
                 self._update_adm_unit_list_background()
         return self.adm_unit_list
+
+    # Returns a list of DQ numbers of employees that have changed in the last time_back_minutes
+    def get_employees_changed(self, time_back_minutes=30):
+        try:
+            adm_units_with_employees = []
+            for d in self.get_adm_unit_list():
+                adm_units_with_employees += d.keys()
+            payload_changes = self._get_payload('employee_changes')
+
+            # Delta uses UTC time
+            time_back_minutes = timedelta(minutes=time_back_minutes)
+            from_time = (datetime.now(tz=timezone.utc) - time_back_minutes).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
+            to_time = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
+
+            payload_changes_with_params = self._set_params(payload_changes, {'fromTime': from_time, "toTime": to_time})
+
+            r = self._make_post_request(payload_changes_with_params)
+
+            if r.ok:
+                employee_list = []
+                json_res = r.json()
+                if len(json_res['queryResultList'][0]['registrationList']) > 0:
+                    for employee in json_res['queryResultList'][0]['registrationList']:
+                        if len(employee['typeRefBiList']) > 0:
+                            for change in employee['typeRefBiList']:
+                                if change['value']['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
+                                    if change["value"]["refObjIdentity"]['uuid'] in adm_units_with_employees:
+                                        employee_list.append({employee['objectUuid']: change["value"]["refObjIdentity"]['uuid']})
+
+                if len(employee_list) > 0:
+                    employee_dq_list = []
+                    payload_employee = self._get_payload('employee_dq_number')
+                    for employee in employee_list:
+                        payload_employee_with_params = self._set_params(payload_employee, {'uuid': next(iter(employee.keys()))})
+                        r = self._make_post_request(payload_employee_with_params)
+                        if r.ok:
+                            json_res = r.json()
+                            if len(json_res['queryResults'][0]['instances']) > 0:
+                                if len(json_res['queryResults'][0]['instances'][0]["inTypeRefs"]) > 0:
+                                    for ref in json_res['queryResults'][0]['instances'][0]["inTypeRefs"]:
+                                        if ref['refObjTypeUserKey'] == 'APOS-Types-User':
+                                            employee_dq_list.append({ref['refObjIdentity']['userKey']: next(iter(employee.values()))})
+
+                    return employee_dq_list
+
+            return []
+        except Exception as e:
+            logger.error(f'Error getting employee changes: {e}')
+            return

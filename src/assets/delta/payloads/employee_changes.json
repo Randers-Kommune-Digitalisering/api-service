@@ -1,0 +1,16 @@
+{
+    "queryList": [
+        {
+            "from": "<fromTime>",
+            "to": "<toTime>",
+            "includeAuthor": false,
+            "objType": "APOS-Types-Engagement",
+            "scopeList": [
+                "BASIC",
+                "STATE",
+                "TYPE_RELATIONS"
+            ]
+        }
+    ],
+    "transaction": "ALL"
+}

@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 src/assets/*/tmp
+src/assets/*/tmp/*
+*.p12
