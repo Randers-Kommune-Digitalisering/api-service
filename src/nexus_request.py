@@ -1,3 +1,5 @@
+import json
+from rich import print_json
 from typing import Optional
 from nexus_client import NEXUSClient, APIClient
 
@@ -43,11 +45,12 @@ class NexusRequest:
 
     def process_response(self, response_json):
         """Processes the JSON response. Customize this based on what you need to do with the response."""
-        print("Processing response...")
-        print(response_json)
+        # print("Processing " +  + " response...")
+        pretty_json = json.dumps(response_json, indent=4)
+        # print_json(pretty_json)
 
 
-def execute_flow(list_of_requests: [NexusRequest]):
+def execute_nexus_flow(list_of_requests: [NexusRequest]):
     cur_response = None
     for request in list_of_requests:
         response = request.execute(cur_response)

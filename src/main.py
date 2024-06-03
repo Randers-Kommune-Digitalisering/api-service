@@ -4,9 +4,9 @@ from prometheus_client import generate_latest
 # from apscheduler.schedulers.background import BackgroundScheduler
 
 from utils.logging import set_logging_configuration, APP_RUNNING
-from utils.config import POD_NAME
+from utils.config import POD_NAME, DEBUG, PORT
 from nexus_client import NEXUSClient
-from nexus_flow_brugerauth import build_flow
+from nexus_flow_brugerauth import execute_brugerauth
 # from background_job import test_job
 # from database import test_database
 
@@ -64,6 +64,6 @@ def test_home_resource():
 
 if __name__ == "__main__":  # pragma: no cover
     # scheduler.start()
-    # app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
     # test_home_resource()
-    build_flow("dqb1029")
+
