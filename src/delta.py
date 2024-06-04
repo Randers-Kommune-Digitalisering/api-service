@@ -88,7 +88,7 @@ class DeltaClient:
         for adm in adm_unit_tree_json:
             if 'identity' in adm:
                 if 'uuid' in adm['identity']:
-                    list_of_adm_units.append(adm['identity']['uuid'] + ': ' + adm['identity']['name'])
+                    list_of_adm_units.append(adm['identity']['uuid'])
             if 'childrenObjects' in adm:
                 for child in adm['childrenObjects']:
                     self._recursive_get_adm_org_units([child], list_of_adm_units)
@@ -96,7 +96,7 @@ class DeltaClient:
     def _check_has_employees_and_add_sub_adm_org_units(self, adm_org_list   , payload):
         adm_org_dict = {}
         for adm_org in adm_org_list:
-            payload_with_params = self._set_params(payload, {'uuid': adm_org.split(':')[0]})
+            payload_with_params = self._set_params(payload, {'uuid': adm_org})
             if not payload_with_params:
                 logger.error('Error setting payload params.')
                 return
@@ -143,12 +143,12 @@ class DeltaClient:
             return
         
     def _update_job(self):
-        start = time.now()
+        start = time.time()
         adm_org_list = self._get_adm_org_list()
         if adm_org_list:
             self.adm_org_list = adm_org_list
             self.last_adm_org_list_updated = datetime.now()
-            logger.info(f'Adm. org. list updated in {time.now() - start} seconds.')
+            logger.info(f'Adm. org. list updated in {time.time() - start} seconds.')
         else:
             logger.error('Error adm. org. list not updated.')
 
