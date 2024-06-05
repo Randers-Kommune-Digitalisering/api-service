@@ -3,6 +3,7 @@ import time
 import base64
 import logging
 import threading
+import pathlib
 import requests_pkcs12
 
 from datetime import datetime, timedelta
@@ -11,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class DeltaClient:
-    def __init__(self, cert_base64, cert_pass, base_url, top_adm_org_uuid, assets_path='./assets/delta/'):
+    def __init__(self, cert_base64, cert_pass, base_url, top_adm_org_uuid, relative_assets_path='assets/delta/'):
         self.cert_base64 = cert_base64
         self.cert_pass = cert_pass
         self.base_url = base_url
         self.top_adm_org_uuid = top_adm_org_uuid
-        self.assets_path = assets_path
+        self.assets_path = os.path.join(pathlib.Path(__file__).parent.resolve(), relative_assets_path)
         self.last_adm_org_list_updated = None
         self.adm_org_list = None
         self.cert_path = self._decode_and_write_cert()
@@ -93,7 +94,7 @@ class DeltaClient:
                 for child in adm['childrenObjects']:
                     self._recursive_get_adm_org_units([child], list_of_adm_units)
 
-    def _check_has_employees_and_add_sub_adm_org_units(self, adm_org_list   , payload):
+    def _check_has_employees_and_add_sub_adm_org_units(self, adm_org_list, payload):
         adm_org_dict = {}
         for adm_org in adm_org_list:
             payload_with_params = self._set_params(payload, {'uuid': adm_org})
@@ -101,7 +102,7 @@ class DeltaClient:
                 logger.error('Error setting payload params.')
                 return
             r = self._make_post_request(payload_with_params)
-            
+
             if r.ok:
                 json_res = r.json()
                 if len(json_res['graphQueryResult'][0]['instances']) > 0:
@@ -118,10 +119,10 @@ class DeltaClient:
                     keys_to_remove.append(key)
                     break
 
-        for key in keys_to_remove:  
+        for key in keys_to_remove:
             adm_org_dict.pop(key)
 
-        return adm_org_dict        
+        return adm_org_dict
 
     def _get_adm_org_list(self):
         try:
@@ -141,14 +142,14 @@ class DeltaClient:
         except Exception as e:
             logger.error(f'Error getting adm. org. list: {e}')
             return
-        
+
     def _update_job(self):
         start = time.time()
         adm_org_list = self._get_adm_org_list()
         if adm_org_list:
             self.adm_org_list = adm_org_list
             self.last_adm_org_list_updated = datetime.now()
-            logger.info(f'Adm. org. list updated in {time.time() - start} seconds.')
+            logger.info(f'Adm. org. list updated in {str(timedelta(seconds=(time.time() - start)))}')
         else:
             logger.error('Error adm. org. list not updated.')
 
