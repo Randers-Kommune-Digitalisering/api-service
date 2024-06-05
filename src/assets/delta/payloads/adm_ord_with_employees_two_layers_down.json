@@ -11,10 +11,19 @@
                     "userKey": "APOS-Types-AdministrativeUnit",
                     "relations": [
                         {
-                            "alias": "eng",
+                            "alias": "employee",
+                            "title": "APOS-Types-Engagement-TypeRelation-AdmUnit",
                             "userKey": "APOS-Types-Engagement-TypeRelation-AdmUnit",
                             "typeUserKey": "APOS-Types-Engagement",
-                            "direction": "IN"
+                            "direction": "IN",
+                            "relations": [
+                                {
+                                    "alias": "adm",
+                                    "userKey": "APOS-Types-Engagement-TypeRelation-AdmUnit",
+                                    "typeUserKey": "APOS-Types-Engagement",
+                                    "direction": "IN"
+                                }
+                            ]
                         }
                     ]
                 },
@@ -29,7 +38,7 @@
                     "criteria": [
                         {
                             "type": "EXIST",
-                            "alias": "adminUnit.eng"
+                            "alias": "adminUnit.employee"
                         },
                         {
                             "type": "MATCH",
@@ -58,11 +67,9 @@
                     ]
                 },
                 "projection": {
-                    "identity": true,
-                    "state": true,
                     "children": {
-                        "identity": true,
-                        "state": true
+                            "children": {
+                            }
                     }
                 }
             },
