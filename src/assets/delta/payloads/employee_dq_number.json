@@ -1,0 +1,22 @@
+{
+    "queries": [
+        {
+            "criteria": {
+                "identity": {
+                    "objUuid": "<uuid>"
+                }
+            },
+            "typeFilter": {
+                "userKey": "APOS-Types-Engagement"
+            },
+            "resultLimit": {
+                "scopeLimitList": [
+                    "IN_TYPE_RELATIONS"
+                ],
+                "limit": 1,
+                "offset": 0
+            },
+            "validDate": "NOW"
+        }
+    ]
+}
