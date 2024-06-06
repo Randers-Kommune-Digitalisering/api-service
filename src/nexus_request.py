@@ -1,6 +1,4 @@
-# import json
-
-from typing import Optional
+from typing import List, Optional
 from nexus_client import NEXUSClient
 
 
@@ -49,7 +47,7 @@ class NexusRequest:
         # print("Processing " +  + " response...")
 
 
-def execute_nexus_flow(list_of_requests: [NexusRequest]):
+def execute_nexus_flow(list_of_requests: List[NexusRequest]):
     cur_response = None
     for request in list_of_requests:
         response = request.execute(cur_response)

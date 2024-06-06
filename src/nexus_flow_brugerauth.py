@@ -33,7 +33,7 @@ def execute_brugerauth(primary_identifier: str, input_organisation_uuid_list: li
     if len(unassigned_organisation_ids) == 0:
         return
 
-# Filter out IDs present in professional_org_list
+    # Filter out IDs present in professional_org_list
     unassigned_organisation_ids = [org_id for org_id in unassigned_organisation_ids if org_id not in [item[0] for item in professional_org_list]]
     if len(unassigned_organisation_ids) == 0:
         return
@@ -51,7 +51,8 @@ def execute_brugerauth(primary_identifier: str, input_organisation_uuid_list: li
 
 def _fetch_professional(primary_identifier):
     # Find professional by query
-    return nexus_client.find_professional_by_query(primary_identifier)[0]
+    if len(nexus_client.find_professional_by_query(primary_identifier)) > 0:
+        return nexus_client.find_professional_by_query(primary_identifier)[0]
 
 
 def _update_professional_organisations(professional, organisation_id_list):
@@ -144,6 +145,6 @@ def _collect_syncIds_and_ids_from_org(org: object):
 
 
 # Example usage
-if __name__ == "__main__":
-    update_nexus_organisation_list()
-    execute_brugerauth("dqb1029", ['bb29e529-06a8-47e7-abe7-8fab6824dbf9'])
+# if __name__ == "__main__":
+#    update_nexus_organisation_list()
+#    execute_brugerauth("dqb1029", ['bb29e529-06a8-47e7-abe7-8fab6824dbf9'])
