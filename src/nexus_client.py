@@ -1,6 +1,7 @@
 import logging
 import time
 import requests
+import json
 
 
 from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
@@ -95,12 +96,23 @@ class APIClient:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
+
         try:
             response = method(url, headers=headers, **kwargs)
             response.raise_for_status()
-            return response.json()
+
+            try:
+                return response.json()
+            except json.JSONDecodeError:
+                # If the response is not JSON, return the response content directly
+                return response.content
+
         except requests.exceptions.RequestException as e:
             logging.error(e)
+            # Print **kwargs to see its contents
+            print("Request kwargs:", kwargs)
+            if response.content:
+                logging.error(response.content)
             return None
 
     def get(self, path):
@@ -132,11 +144,11 @@ class NEXUSClient:
     def get_request(self, path):
         return self.api_client.get(path)
 
-    def post_request(self, path, json):
-        return self.api_client.post(path, data=json)
+    def post_request(self, path, data):
+        return self.api_client.post(path, data=data)
 
-    def put_request(self, path, json):
-        return self.api_client.put(path, data=json)
+    def put_request(self, path, data):
+        return self.api_client.put(path, data=data)
 
     def delete_request(self, path):
         return self.api_client.delete(path)
