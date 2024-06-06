@@ -1,5 +1,4 @@
 import json
-from rich import print_json
 from typing import Optional
 from nexus_client import NEXUSClient, APIClient
 
