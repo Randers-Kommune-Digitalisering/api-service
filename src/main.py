@@ -6,7 +6,7 @@ from prometheus_client import generate_latest
 from utils.logging import set_logging_configuration, APP_RUNNING
 from utils.config import POD_NAME, DEBUG, PORT
 from nexus_client import NEXUSClient
-from nexus_flow_brugerauth import execute_brugerauth
+# from nexus_flow_brugerauth import execute_brugerauth
 # from background_job import test_job
 # from database import test_database
 

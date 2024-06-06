@@ -1,10 +1,12 @@
-import json
+# import json
+
 from typing import Optional
 from nexus_client import NEXUSClient
 
 
 # Create an instance of NEXUSClient
 nexus_client = NEXUSClient()
+
 
 class NexusRequest:
     def __init__(self, link_href: str, method: str, input_response: Optional[dict] = None, json_body: Optional[dict] = None):
