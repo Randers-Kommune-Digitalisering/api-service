@@ -1,6 +1,6 @@
 import json
 from typing import Optional
-from nexus_client import NEXUSClient, APIClient
+from nexus_client import NEXUSClient
 
 
 # Create an instance of NEXUSClient
@@ -45,8 +45,6 @@ class NexusRequest:
     def process_response(self, response_json):
         """Processes the JSON response. Customize this based on what you need to do with the response."""
         # print("Processing " +  + " response...")
-        pretty_json = json.dumps(response_json, indent=4)
-        # print_json(pretty_json)
 
 
 def execute_nexus_flow(list_of_requests: [NexusRequest]):

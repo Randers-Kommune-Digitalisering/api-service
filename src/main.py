@@ -66,4 +66,3 @@ if __name__ == "__main__":  # pragma: no cover
     # scheduler.start()
     app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
     # test_home_resource()
-
