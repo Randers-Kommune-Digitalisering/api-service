@@ -41,7 +41,7 @@ class APIClient:
             self.refresh_token_expiry = time.time() + data.get('refresh_expires_in', 0)
             return self.access_token
         except requests.exceptions.RequestException as e:
-            logging.error(e)
+            logger.error(e)
             return None
 
     def refresh_access_token(self):
@@ -67,7 +67,7 @@ class APIClient:
             self.refresh_token_expiry = time.time() + data.get('refresh_expires_in', 0)
             return self.access_token
         except requests.exceptions.RequestException as e:
-            logging.error(e)
+            logger.error(e)
             return None
 
     def authenticate(self):
@@ -108,11 +108,9 @@ class APIClient:
                 return response.content
 
         except requests.exceptions.RequestException as e:
-            logging.error(e)
-            # Print **kwargs to see its contents
-            print("Request kwargs:", kwargs)
+            logger.error(e)
             if response.content:
-                logging.error(response.content)
+                logger.error(response.content)
             return None
 
     def get(self, path):

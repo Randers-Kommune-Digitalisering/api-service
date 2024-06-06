@@ -1,6 +1,9 @@
+import logging
+
 from nexus_request import NexusRequest, execute_nexus_flow
 from nexus_client import NEXUSClient
 
+logger = logging.getLogger(__name__)
 nexus_client = NEXUSClient()
 
 active_org_list = []
@@ -11,7 +14,7 @@ def update_nexus_organisation_list():
 
     # Get all organisations as list of tuples - [0] being id, [1] being uuid
     active_org_list = _fetch_all_active_organisations()
-    # print(active_org_list)
+    # logger.info(active_org_list)
 
 
 def execute_brugerauth(primary_identifier: str, input_organisation_uuid_list: list):
@@ -21,8 +24,8 @@ def execute_brugerauth(primary_identifier: str, input_organisation_uuid_list: li
 
     # Get all assigned organisations for professional as list of tuples - [0] being id, [1] being uuid
     professional_org_list = _fetch_professional_org_syncIds(professional)
-    print("Professional current organisation:")
-    print(professional_org_list)
+    logger.info("Professional current organisation:")
+    logger.info(professional_org_list)
 
     # uuids from active_org_list not found in input_organisation_uuid_list
     unassigned_organisation_ids = [item[0] for item in active_org_list if item[1] in input_organisation_uuid_list]
@@ -37,13 +40,13 @@ def execute_brugerauth(primary_identifier: str, input_organisation_uuid_list: li
 
     # Remove duplicates
     unassigned_organisation_ids = list(set(unassigned_organisation_ids))
-    print("Professional unassigned organisation:")
-    print(unassigned_organisation_ids)
+    logger.info("Professional unassigned organisation:")
+    logger.info(unassigned_organisation_ids)
 
     # Update the organisations for the professional
     result = _update_professional_organisations(professional, unassigned_organisation_ids)
     if result:
-        print("success " + result)
+        logger.info("success " + result)
 
 
 def _fetch_professional(primary_identifier):
@@ -136,7 +139,7 @@ def _collect_syncIds_and_ids_from_org(org: object):
         for child in org.get('children', []):
             sync_ids_and_ids.extend(_collect_syncIds_and_ids_from_org(child))
     else:
-        print(f"Unexpected type for org: {type(org)}")
+        logger.info(f"Unexpected type for org: {type(org)}")
     return sync_ids_and_ids
 
 
