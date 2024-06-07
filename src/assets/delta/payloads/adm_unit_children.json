@@ -1,0 +1,23 @@
+{
+    "queries": [
+        {
+            "criteria": {
+                "identity": {
+                    "objUuid": "<uuid>"
+                }
+            },
+            "typeFilter": {
+                "userKey": "APOS-Types-AdministrativeUnit"
+            },
+            "resultLimit": {
+                "scopeLimitList": [
+                    "STATE",
+                    "CHILDREN_UUID"
+                ],
+                "limit": 1,
+                "offset": 0
+            },
+            "validDate": "NOW"
+        }
+    ]
+}
