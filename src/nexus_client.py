@@ -1,8 +1,10 @@
 import logging
-import requests
 import time
+import requests
+import json
 
-from .config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
+
+from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ class APIClient:
             self.refresh_token_expiry = time.time() + data.get('refresh_expires_in', 0)
             return self.access_token
         except requests.exceptions.RequestException as e:
-            logging.error(e)
+            logger.error(e)
             return None
 
     def refresh_access_token(self):
@@ -65,7 +67,7 @@ class APIClient:
             self.refresh_token_expiry = time.time() + data.get('refresh_expires_in', 0)
             return self.access_token
         except requests.exceptions.RequestException as e:
-            logging.error(e)
+            logger.error(e)
             return None
 
     def authenticate(self):
@@ -85,17 +87,30 @@ class APIClient:
 
     def _make_request(self, method, path, **kwargs):
         token = self.get_access_token()
-        url = f"{self.nexus_url}/{path}"
+        # Check if the path is a full URL
+        if path.startswith("http://") or path.startswith("https://"):
+            url = path
+        else:
+            url = f"{self.nexus_url}/{path}"
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
+
         try:
             response = method(url, headers=headers, **kwargs)
             response.raise_for_status()
-            return response.json()
+
+            try:
+                return response.json()
+            except json.JSONDecodeError:
+                # If the response is not JSON, return the response content directly
+                return response.content
+
         except requests.exceptions.RequestException as e:
-            logging.error(e)
+            logger.error(e)
+            if response.content:
+                logger.error(response.content)
             return None
 
     def get(self, path):
@@ -116,7 +131,22 @@ class NEXUSClient:
     def __init__(self):
         self.api_client = APIClient(NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
 
-    # Home resource
     def home_resource(self):
         path = "api/core/mobile/randers/v2/"
         return self.api_client.get(path)
+
+    def find_professional_by_query(self, query):
+        path = "api/core/mobile/randers/v2/professionals/?query=" + query
+        return self.api_client.get(path)
+
+    def get_request(self, path):
+        return self.api_client.get(path)
+
+    def post_request(self, path, data):
+        return self.api_client.post(path, data=data)
+
+    def put_request(self, path, data):
+        return self.api_client.put(path, data=data)
+
+    def delete_request(self, path):
+        return self.api_client.delete(path)
