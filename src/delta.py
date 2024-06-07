@@ -21,27 +21,13 @@ class DeltaClient:
         self.assets_path = os.path.join(pathlib.Path(__file__).parent.resolve(), relative_assets_path)
         self.last_adm_org_list_updated = None
         self.adm_org_list = None
-        self.cert_path = self._decode_and_write_cert()
+        self.cert_data = base64.b64decode(cert_base64)
         self.payloads = {os.path.splitext(file)[0]: os.path.join(os.path.join(self.assets_path, 'payloads/'), file) for file in os.listdir(os.path.join(self.assets_path, 'payloads/')) if file.endswith('.json')}
         self.headers = {'Content-Type': 'application/json'}
 
-    def _decode_and_write_cert(self):
-        try:
-            decoded_data = base64.b64decode(self.cert_base64)
-            cert_dir = os.path.join(self.assets_path, 'tmp/')
-            os.makedirs(cert_dir, exist_ok=True)
-            cert_path = os.path.join(cert_dir, 'delta_cert.p12')
-            with open(cert_path, 'wb') as file:
-                file.write(decoded_data)
-                return cert_path
-        except Exception as e:
-            logger.error(f'Error setting certificate: {e}')
-            return
-
-    def _get_cert_path_and_pass(self):
-        if self.cert_path is not None and self.cert_pass is not None:
-            if os.path.isfile(self.cert_path):
-                return self.cert_path, self.cert_pass
+    def _get_cert_data_and_pass(self):
+        if self.cert_data is not None and self.cert_pass is not None:
+            return self.cert_data, self.cert_pass
         return False, False
 
     def _get_payload(self, payload_name):
@@ -70,15 +56,15 @@ class DeltaClient:
         return payload
 
     def _make_post_request(self, payload):
-        cert_path, cert_pass = self._get_cert_path_and_pass()
-        if cert_path and cert_pass:
+        cert_data, cert_pass = self._get_cert_data_and_pass()
+        if cert_data and cert_pass:
             try:
                 path = '/query' if 'queries' in payload else '/graph-query' if 'graphQueries' in payload else '/history' if 'queryList' in payload else None
                 if not path:
                     logger.error('Payload is invalid.')
                     return
                 url = self.base_url.rstrip('/') + path
-                response = requests_pkcs12.post(url, data=payload, headers=self.headers, pkcs12_filename=cert_path, pkcs12_password=cert_pass)
+                response = requests_pkcs12.post(url, data=payload, headers=self.headers, pkcs12_data=cert_data, pkcs12_password=cert_pass)
                 return response
             except Exception as e:
                 logger.error(f'Error making POST request: {e}')
