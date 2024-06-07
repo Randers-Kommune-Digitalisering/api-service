@@ -1,5 +1,5 @@
 from typing import List, Optional
-from nexus_client import NEXUSClient
+from nexus.nexus_client import NEXUSClient
 
 
 # Create an instance of NEXUSClient

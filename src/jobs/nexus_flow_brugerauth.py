@@ -1,23 +1,28 @@
 import logging
 
-from nexus_request import NexusRequest, execute_nexus_flow
-from nexus_client import NEXUSClient
+from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID
+from delta import DeltaClient
+from nexus.nexus_request import NexusRequest, execute_nexus_flow
+from nexus.nexus_client import NEXUSClient
 
 logger = logging.getLogger(__name__)
 nexus_client = NEXUSClient()
-
-active_org_list = []
-
-
-def update_nexus_organisation_list():
-    global active_org_list
-
-    # Get all organisations as list of tuples - [0] being id, [1] being uuid
-    active_org_list = _fetch_all_active_organisations()
-    # logger.info(active_org_list)
+delta_client = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_PASS, base_url=DELTA_BASE_URL, top_adm_org_uuid=DELTA_TOP_ADM_UNIT_UUID)
 
 
-def execute_brugerauth(primary_identifier: str, input_organisation_uuid_list: list):
+def job():
+    try:
+        active_org_list = _fetch_all_active_organisations()
+        employees_changed_list = delta_client.get_employees_changed()
+        for employee in employees_changed_list:
+            execute_brugerauth(active_org_list, employee['user'], employee['organizations'])
+        return True
+    except Exception as e:
+        logger.error(f"Error in job: {e}")
+        return False
+
+
+def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list):
     professional = _fetch_professional(primary_identifier)
     if not professional:
         return
