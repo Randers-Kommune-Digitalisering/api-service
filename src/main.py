@@ -3,7 +3,7 @@ from healthcheck import HealthCheck
 from prometheus_client import generate_latest
 
 from utils.logging import set_logging_configuration, APP_RUNNING
-from utils.config import POD_NAME, DEBUG, PORT
+from utils.config import DEBUG, PORT, POD_NAME
 
 
 def create_app():

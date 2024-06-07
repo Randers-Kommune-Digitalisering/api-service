@@ -2,23 +2,25 @@ import os
 import time
 import base64
 import logging
+import pathlib
 import threading
+import collections
 import requests_pkcs12
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
 
 class DeltaClient:
-    def __init__(self, cert_base64, cert_pass, base_url, top_adm_unit_uuid, assets_path='./assets/delta/'):
+    def __init__(self, cert_base64, cert_pass, base_url, top_adm_org_uuid, relative_assets_path='assets/delta/'):
         self.cert_base64 = cert_base64
         self.cert_pass = cert_pass
         self.base_url = base_url
-        self.top_adm_unit_uuid = top_adm_unit_uuid
-        self.assets_path = assets_path
-        self.last_adm_unit_list_updated = None
-        self.adm_unit_list = None
+        self.top_adm_org_uuid = top_adm_org_uuid
+        self.assets_path = os.path.join(pathlib.Path(__file__).parent.resolve(), relative_assets_path)
+        self.last_adm_org_list_updated = None
+        self.adm_org_list = None
         self.cert_path = self._decode_and_write_cert()
         self.payloads = {os.path.splitext(file)[0]: os.path.join(os.path.join(self.assets_path, 'payloads/'), file) for file in os.listdir(os.path.join(self.assets_path, 'payloads/')) if file.endswith('.json')}
         self.headers = {'Content-Type': 'application/json'}
@@ -33,7 +35,7 @@ class DeltaClient:
                 file.write(decoded_data)
                 return cert_path
         except Exception as e:
-            logger.error(f'Error decoding certificate: {e}')
+            logger.error(f'Error setting certificate: {e}')
             return
 
     def _get_cert_path_and_pass(self):
@@ -84,81 +86,160 @@ class DeltaClient:
             logger.error('Certificate path or password is invalid.')
         return
 
-    def _recursive_get_adm_units(self, adm_unit_list, payload, uuid):
-        adm_unit_list.append(uuid)
-        payload_with_params = self._set_params(payload, {'uuid': uuid})
-        if not payload_with_params:
-            logger.error('Error setting payload params.')
-            return
+    def _recursive_get_adm_org_units(self, adm_unit_tree_json, list_of_adm_units):
+        for adm in adm_unit_tree_json:
+            if 'identity' in adm:
+                if 'uuid' in adm['identity']:
+                    list_of_adm_units.append(adm['identity']['uuid'])
+            if 'childrenObjects' in adm:
+                for child in adm['childrenObjects']:
+                    self._recursive_get_adm_org_units([child], list_of_adm_units)
 
-        r = self._make_post_request(payload_with_params)
-        if r.ok:
-            try:
-                json_res = r.json()
-                if 'children' in json_res['queryResults'][0]['instances'][0]:
-                    children = json_res['queryResults'][0]['instances'][0]['children']
-                    if len(children) > 0:
-                        for child in children:
-                            self._recursive_get_adm_units(adm_unit_list, payload, child['uuid'])
-            except Exception as e:
-                logger.error(f'Error parsing JSON response: {e}')
+    def _check_has_employees_and_add_sub_adm_org_units(self, adm_org_list, payload):
+        adm_org_dict = {}
+        for adm_org in adm_org_list:
+            payload_with_params = self._set_params(payload, {'uuid': adm_org})
+            if not payload_with_params:
+                logger.error('Error setting payload params.')
                 return
+            r = self._make_post_request(payload_with_params)
 
-    def _check_has_employees_and_add_teams(self, adm_unit_list, payload):
-        adm_unit_list_with_employees = []
-        for adm_unit in adm_unit_list:
-            payload_with_params = self._set_params(payload, {'uuid': adm_unit})
+            if r.ok:
+                json_res = r.json()
+                if len(json_res['graphQueryResult'][0]['instances']) > 0:
+                    sub_adm_orgs = []
+                    self._recursive_get_adm_org_units(json_res['graphQueryResult'][0]['instances'], sub_adm_orgs)
+                    sub_adm_orgs = [e for e in sub_adm_orgs if e != adm_org]
+                    adm_org_dict[adm_org] = sub_adm_orgs
+
+        # Deletes adm. org. units with sub adm. org. units with employees
+        keys_to_remove = []
+        for key, value in adm_org_dict.items():
+            for sub_adm_org in value:
+                if sub_adm_org in adm_org_dict.keys() and key not in keys_to_remove:
+                    keys_to_remove.append(key)
+                    break
+
+        for key in keys_to_remove:
+            adm_org_dict.pop(key)
+
+        return adm_org_dict
+
+    def _get_adm_org_list(self):
+        try:
+            payload = self._get_payload('adm_org_tree')
+            payload_with_params = self._set_params(payload, {'uuid': self.top_adm_org_uuid})
             if not payload_with_params:
                 logger.error('Error setting payload params.')
                 return
             r = self._make_post_request(payload_with_params)
             if r.ok:
-                try:
-                    json_res = r.json()
-                    teams = []
-                    if len(json_res['graphQueryResult'][0]['instances']) > 0:
-                        if 'childrenObjects' in json_res['graphQueryResult'][0]['instances'][0]:
-                            children = json_res['graphQueryResult'][0]['instances'][0]['childrenObjects']
-                            if len(children) > 0:
-                                for child in children:
-                                    teams.append(child['identity']['uuid'])
-                    adm_unit_list_with_employees.append({adm_unit: teams})
-                except Exception as e:
-                    logger.error(f'Error parsing JSON response: {e}')
-                    return
-        return adm_unit_list_with_employees
-
-    def _get_adm_unit_list(self):
-        try:
-            start = time.time()
-            temp_adm_unit_list = []
-            payload_children = self._get_payload('adm_unit_children')
-            self._recursive_get_adm_units(temp_adm_unit_list, payload_children, self.top_adm_unit_uuid)
-            payload_employees = self._get_payload('adm_unit_with_employees_teams')
-            adm_unit_list = self._check_has_employees_and_add_teams(temp_adm_unit_list, payload_employees)
-            logger.info('Updated admin unit list, time for update: ', str(timedelta(seconds=time.time() - start)))
-            return adm_unit_list
+                json_res = r.json()
+                if len(json_res['graphQueryResult'][0]['instances']) > 0:
+                    adm_org_list = []
+                    self._recursive_get_adm_org_units(json_res['graphQueryResult'][0]['instances'], adm_org_list)
+                    payload = self._get_payload('adm_ord_with_employees_two_layers_down')
+                    return self._check_has_employees_and_add_sub_adm_org_units(adm_org_list, payload)
         except Exception as e:
-            logger.error(f'Error getting ADM unit list: {e}')
+            logger.error(f'Error getting adm. org. list: {e}')
             return
 
-    def _update_adm_unit_list_background(self):
-        def thread_job():
-            self.adm_unit_list = self._get_adm_unit_list()
-            self.last_adm_unit_list_updated = datetime.now()
+    def _update_job(self):
+        start = time.time()
+        adm_org_list = self._get_adm_org_list()
+        if adm_org_list:
+            self.adm_org_list = adm_org_list
+            self.last_adm_org_list_updated = datetime.now()
+            logger.info(f'Adm. org. list updated in {str(timedelta(seconds=(time.time() - start)))}')
+        else:
+            logger.error('Error adm. org. list not updated.')
 
-        thread = threading.Thread(target=thread_job)
+    def _update_adm_org_list_background(self):
+        thread = threading.Thread(target=self._update_job)
         thread.start()
 
-    # returns a list of dictionaries with the admin unit UUID as the key and a list of team (sub admin units) UUIDs as the value
-    def get_adm_unit_list(self):
-        if not self.adm_unit_list:
-            self.adm_unit_list = self._get_adm_unit_list()
-            self.last_adm_unit_list_updated = datetime.now()
+    # returns a dictionaries with the admin organization unit UUID as the key and a list of sub admin organization unit UUIDs as the value
+    def get_adm_org_lists(self):
+        if not self.adm_org_list:
+            self._update_job()
         else:
-            if self.last_adm_unit_list_updated:
-                if (datetime.now() - self.last_adm_unit_list_updated).total_seconds() > 4 * 60 * 60:
-                    self._update_adm_unit_list_background()
+            if self.last_adm_org_list_updated:
+                # Update every hour
+                if (datetime.now() - self.last_adm_org_list_updated).total_seconds() > 60 * 60:
+                    self._update_adm_org_list_background()
             else:
-                self._update_adm_unit_list_background()
-        return self.adm_unit_list
+                self._update_adm_org_list_background()
+        return self.adm_org_list
+
+    # Returns a list of dictionaries with key 'user' containing DQ-numberand key 'organizations' containing a list of UUIDs for organizations they need access to
+    def get_employees_changed(self, time_back_minutes=30):
+        try:
+            adm_org_units_with_employees = self.get_adm_org_lists()
+            start = time.time()
+            payload_changes = self._get_payload('employee_changes')
+
+            # Delta uses UTC time
+            time_back_minutes = timedelta(minutes=time_back_minutes)
+            from_time = (datetime.now(tz=timezone.utc) - time_back_minutes).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
+            to_time = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
+
+            payload_changes_with_params = self._set_params(payload_changes, {'fromTime': from_time, "toTime": to_time})
+
+            r = self._make_post_request(payload_changes_with_params)
+
+            if r.ok:
+                changes_list = []
+                json_res = r.json()
+                employee_changed_list = []
+
+                # If any changes
+                if len(json_res['queryResultList'][0]['registrationList']) > 0:
+                    # Iterate over changes
+                    for change in json_res['queryResultList'][0]['registrationList']:
+                        if len(change['typeRefBiList']) > 0:
+                            # If change to admin unit
+                            if change['typeRefBiList'][0]['value']['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
+                                # if admin unit is relevant (on the list)
+                                if change['typeRefBiList'][0]["value"]["refObjIdentity"]['uuid'] in adm_org_units_with_employees.keys():
+                                    changes_list.append({'employee': change['objectUuid'], 'admunit': change['typeRefBiList'][0]["value"]["refObjIdentity"]['uuid'], 'time': datetime.strptime(change['regDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ')})
+
+                # Split _list into a list of lists (for each employee)
+                by_employee = collections.defaultdict(list)
+                for d in changes_list:
+                    by_employee[d['employee']].append(d)
+
+                # Only keep the lastest for each employee
+                employee_list = []
+                for same_employee_list in list(by_employee.values()):
+                    same_employee_list = sorted(same_employee_list, key=lambda x: x['time'], reverse=True)
+                    same_employee_list = [same_employee_list[0]] if same_employee_list else []
+                    employee_list.extend(same_employee_list)
+
+                if len(employee_list) > 0:
+                    payload_employee = self._get_payload('employee_dq_number')
+                    for employee in employee_list:
+                        payload_employee_with_params = self._set_params(payload_employee, {'uuid': employee['employee']})
+                        r = self._make_post_request(payload_employee_with_params)
+                        if r.ok:
+                            json_res = r.json()
+                            if len(json_res['queryResults'][0]['instances']) > 0:
+                                first_res = json_res['queryResults'][0]['instances'][0]
+                                # Check employee is active
+                                if first_res['state'] == 'STATE_ACTIVE' and len(first_res['typeRefs']) > 0:
+                                    for relation in first_res['typeRefs']:
+                                        if relation['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
+                                            # Check if relation to admin unit is correct
+                                            if relation['refObjIdentity']['uuid'] == employee['admunit']:
+                                                if len(first_res["inTypeRefs"]) > 0:
+                                                    for ref in first_res["inTypeRefs"]:
+                                                        if ref['refObjTypeUserKey'] == 'APOS-Types-User':
+                                                            # Add employee to dictionary with key DQ number and value admin unit UUID
+                                                            employee_changed_list.append({'user': ref['refObjIdentity']['userKey'], 'organizations': [employee['admunit']] + adm_org_units_with_employees[employee['admunit']]})
+                logger.info(f'Got employee changes in {str(timedelta(seconds=(time.time() - start)))}')
+                return employee_changed_list
+            else:
+                raise Exception('Failed to get employee changes from delta.')
+
+        except Exception as e:
+            logger.error(f'Error getting employee changes: {e}')
+            return

@@ -7,12 +7,13 @@
                 }
             },
             "typeFilter": {
-                "userKey": "APOS-Types-AdministrativeUnit"
+                "userKey": "APOS-Types-Engagement"
             },
             "resultLimit": {
                 "scopeLimitList": [
                     "STATE",
-                    "CHILDREN_UUID"
+                    "TYPE_RELATIONS",
+                    "IN_TYPE_RELATIONS"
                 ],
                 "limit": 1,
                 "offset": 0
