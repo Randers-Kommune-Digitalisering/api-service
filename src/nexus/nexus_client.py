@@ -2,6 +2,7 @@ import logging
 import time
 import requests
 import json
+import threading
 
 
 from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
@@ -11,14 +12,24 @@ logger = logging.getLogger(__name__)
 
 # Håndtering af http request
 class APIClient:
+    _instance = None
+
+    def __new__(cls, nexus_url, client_id, client_secret):
+        if cls._instance is None:
+            cls._instance = super(APIClient, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self, nexus_url, client_id, client_secret):
-        self.nexus_url = nexus_url
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.access_token = None
-        self.access_token_expiry = None
-        self.refresh_token = None
-        self.refresh_token_expiry = None
+        if not self._initialized:  # Check if already initialized
+            self.nexus_url = nexus_url
+            self.client_id = client_id
+            self.client_secret = client_secret
+            self.access_token = None
+            self.access_token_expiry = None
+            self.refresh_token = None
+            self.refresh_token_expiry = None
+            self._initialized = True
 
     def request_access_token(self):
         # Request a new access token using client credentials
@@ -140,7 +151,7 @@ class NEXUSClient:
         return self.api_client.get(path)
 
     def find_patient_by_query(self, query):
-        path = "api/core/mobile/randers/v2/professionals/?query=" + query
+        path = "api/core/mobile/randers/v2/patients/?query=" + query
         return self.api_client.get(path)
 
     def get_request(self, path):
