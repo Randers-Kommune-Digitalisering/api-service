@@ -2,8 +2,6 @@ import logging
 import time
 import requests
 import json
-import threading
-
 
 from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
 

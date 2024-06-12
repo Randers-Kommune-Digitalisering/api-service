@@ -52,7 +52,7 @@ class NexusRequest:
             final_url += '?' + '&'.join([f"{key}={value}" for key, value in self.params.items()])
 
         if self.method == 'GET':
-                response = nexus_client.get_request(final_url)
+            response = nexus_client.get_request(final_url)
         elif self.method == 'POST':
             response = nexus_client.post_request(final_url, data=self.json_body)
         elif self.method == 'PUT':

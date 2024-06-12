@@ -7,6 +7,7 @@ from nexus.nexus_client import NEXUSClient
 logger = logging.getLogger(__name__)
 nexus_client = NEXUSClient()
 
+
 def execute_lukning(cpr: str):
     try:
         # Find patient by CPR
@@ -27,6 +28,7 @@ def _fetch_patient_by_query(query):
     patient_response = nexus_client.get_request(path=patient_link)
     request1 = NexusRequest(input_response=patient_response[0], link_href="self", method="GET")
     return execute_nexus_flow([request1])
+
 
 def cancel_visits(patient):
 
@@ -58,14 +60,12 @@ def cancel_visits(patient):
     # Save ids of upcoming events
     event_ids = [event['event']['id'] for event in events_list['events']]
 
-    # Is list empty?
+    # If list is empty, stopEvents request will timeout
     if not event_ids:
         return
 
     # Stop events request
     request1 = NexusRequest(input_response=events_list, link_href="stopEvents", method="POST", json_body=event_ids)
-
-
 
 
 if __name__ == '__main__':
