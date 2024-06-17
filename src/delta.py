@@ -119,18 +119,19 @@ class DeltaClient:
                 logger.error('Error setting payload params.')
                 return
             r = self._make_post_request(payload_with_params)
-            if r.ok:
-                json_res = r.json()
-                if len(json_res['graphQueryResult'][0]['instances']) > 0:
-                    adm_org_list = []
-                    self._recursive_get_adm_org_units(json_res['graphQueryResult'][0]['instances'], adm_org_list)
-                    payload = self._get_payload('adm_ord_with_employees_two_layers_down')
-                    return self._check_has_employees_and_add_sub_adm_org_units(adm_org_list, payload)
+            r.raise_for_status()
+            json_res = r.json()
+            if len(json_res['graphQueryResult'][0]['instances']) > 0:
+                adm_org_list = []
+                self._recursive_get_adm_org_units(json_res['graphQueryResult'][0]['instances'], adm_org_list)
+                payload = self._get_payload('adm_ord_with_employees_two_layers_down')
+                return self._check_has_employees_and_add_sub_adm_org_units(adm_org_list, payload)
         # except Exception as e::
             # logger.error(f'Error getting adm. org. list: {e}')
             return
 
     def _update_job(self):
+        logger.info(f'Updating adm. org. list')
         start = time.time()
         adm_org_list = self._get_adm_org_list()
         if adm_org_list:
