@@ -142,12 +142,14 @@ class DeltaClient:
             logger.error('Error adm. org. list not updated.')
 
     def _update_adm_org_list_background(self):
+        logger.info('Background update')
         thread = threading.Thread(target=self._update_job)
         thread.start()
 
     # returns a dictionaries with the admin organization unit UUID as the key and a list of sub admin organization unit UUIDs as the value
     def get_adm_org_lists(self):
         if not self.adm_org_list:
+            logger.info('Foreground update')
             self._update_job()
         else:
             if self.last_adm_org_list_updated:
@@ -162,7 +164,9 @@ class DeltaClient:
     def get_employees_changed(self, time_back_minutes=30):
         # try:
             adm_org_units_with_employees = self.get_adm_org_lists()
-            logger.info(adm_org_units_with_employees)
+            if not adm_org_units_with_employees:
+                raise Exception('Error getting adm. org. units with employees.')
+            
             start = time.time()
             payload_changes = self._get_payload('employee_changes')
 
