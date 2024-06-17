@@ -82,15 +82,15 @@ class DeltaClient:
                     self._recursive_get_adm_org_units([child], list_of_adm_units)
 
     def _check_has_employees_and_add_sub_adm_org_units(self, adm_org_list, payload):
-        adm_org_dict = {}
-        for adm_org in adm_org_list:
-            payload_with_params = self._set_params(payload, {'uuid': adm_org})
-            if not payload_with_params:
-                logger.error('Error setting payload params.')
-                return
-            r = self._make_post_request(payload_with_params)
-
-            if r.ok:
+        try:
+            adm_org_dict = {}
+            for adm_org in adm_org_list:
+                payload_with_params = self._set_params(payload, {'uuid': adm_org})
+                if not payload_with_params:
+                    logger.error('Error setting payload params.')
+                    return
+                r = self._make_post_request(payload_with_params)
+                r.raise_for_status()
                 json_res = r.json()
                 if len(json_res['graphQueryResult'][0]['instances']) > 0:
                     sub_adm_orgs = []
@@ -98,18 +98,21 @@ class DeltaClient:
                     sub_adm_orgs = [e for e in sub_adm_orgs if e != adm_org]
                     adm_org_dict[adm_org] = sub_adm_orgs
 
-        # Deletes adm. org. units with sub adm. org. units with employees
-        keys_to_remove = []
-        for key, value in adm_org_dict.items():
-            for sub_adm_org in value:
-                if sub_adm_org in adm_org_dict.keys() and key not in keys_to_remove:
-                    keys_to_remove.append(key)
-                    break
+            # Deletes adm. org. units with sub adm. org. units with employees
+            keys_to_remove = []
+            for key, value in adm_org_dict.items():
+                for sub_adm_org in value:
+                    if sub_adm_org in adm_org_dict.keys() and key not in keys_to_remove:
+                        keys_to_remove.append(key)
+                        break
 
-        for key in keys_to_remove:
-            adm_org_dict.pop(key)
+            for key in keys_to_remove:
+                adm_org_dict.pop(key)
 
-        return adm_org_dict
+            return adm_org_dict
+        except Exception as e:
+            logger.error(f'Error checking sub adm. org. and employees: {e}')
+            return
 
     def _get_adm_org_list(self):
         try:
@@ -119,18 +122,19 @@ class DeltaClient:
                 logger.error('Error setting payload params.')
                 return
             r = self._make_post_request(payload_with_params)
-            if r.ok:
-                json_res = r.json()
-                if len(json_res['graphQueryResult'][0]['instances']) > 0:
-                    adm_org_list = []
-                    self._recursive_get_adm_org_units(json_res['graphQueryResult'][0]['instances'], adm_org_list)
-                    payload = self._get_payload('adm_ord_with_employees_two_layers_down')
-                    return self._check_has_employees_and_add_sub_adm_org_units(adm_org_list, payload)
+            r.raise_for_status()
+            json_res = r.json()
+            if len(json_res['graphQueryResult'][0]['instances']) > 0:
+                adm_org_list = []
+                self._recursive_get_adm_org_units(json_res['graphQueryResult'][0]['instances'], adm_org_list)
+                payload = self._get_payload('adm_ord_with_employees_two_layers_down')
+                return self._check_has_employees_and_add_sub_adm_org_units(adm_org_list, payload)
         except Exception as e:
             logger.error(f'Error getting adm. org. list: {e}')
             return
 
     def _update_job(self):
+        logger.info('Updating adm. org. list')
         start = time.time()
         adm_org_list = self._get_adm_org_list()
         if adm_org_list:
@@ -141,12 +145,14 @@ class DeltaClient:
             logger.error('Error adm. org. list not updated.')
 
     def _update_adm_org_list_background(self):
+        logger.info('Background update')
         thread = threading.Thread(target=self._update_job)
         thread.start()
 
     # returns a dictionaries with the admin organization unit UUID as the key and a list of sub admin organization unit UUIDs as the value
     def get_adm_org_lists(self):
         if not self.adm_org_list:
+            logger.info('Foreground update')
             self._update_job()
         else:
             if self.last_adm_org_list_updated:
@@ -161,6 +167,9 @@ class DeltaClient:
     def get_employees_changed(self, time_back_minutes=30):
         try:
             adm_org_units_with_employees = self.get_adm_org_lists()
+            if not adm_org_units_with_employees:
+                raise Exception('Error getting adm. org. units with employees.')
+
             start = time.time()
             payload_changes = self._get_payload('employee_changes')
 
@@ -172,59 +181,57 @@ class DeltaClient:
             payload_changes_with_params = self._set_params(payload_changes, {'fromTime': from_time, "toTime": to_time})
 
             r = self._make_post_request(payload_changes_with_params)
+            r.raise_for_status()
 
-            if r.ok:
-                changes_list = []
-                json_res = r.json()
-                employee_changed_list = []
+            changes_list = []
+            json_res = r.json()
+            employee_changed_list = []
 
-                # If any changes
-                if len(json_res['queryResultList'][0]['registrationList']) > 0:
-                    # Iterate over changes
-                    for change in json_res['queryResultList'][0]['registrationList']:
-                        if len(change['typeRefBiList']) > 0:
-                            # If change to admin unit
-                            if change['typeRefBiList'][0]['value']['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
-                                # if admin unit is relevant (on the list)
-                                if change['typeRefBiList'][0]["value"]["refObjIdentity"]['uuid'] in adm_org_units_with_employees.keys():
-                                    changes_list.append({'employee': change['objectUuid'], 'admunit': change['typeRefBiList'][0]["value"]["refObjIdentity"]['uuid'], 'time': datetime.strptime(change['regDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ')})
+            # If any changes
+            if len(json_res['queryResultList'][0]['registrationList']) > 0:
+                # Iterate over changes
+                for change in json_res['queryResultList'][0]['registrationList']:
+                    if len(change['typeRefBiList']) > 0:
+                        # If change to admin unit
+                        if change['typeRefBiList'][0]['value']['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
+                            # if admin unit is relevant (on the list)
+                            if change['typeRefBiList'][0]["value"]["refObjIdentity"]['uuid'] in adm_org_units_with_employees.keys():
+                                changes_list.append({'employee': change['objectUuid'], 'admunit': change['typeRefBiList'][0]["value"]["refObjIdentity"]['uuid'], 'time': datetime.strptime(change['regDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ')})
 
-                # Split _list into a list of lists (for each employee)
-                by_employee = collections.defaultdict(list)
-                for d in changes_list:
-                    by_employee[d['employee']].append(d)
+            # Split _list into a list of lists (for each employee)
+            by_employee = collections.defaultdict(list)
+            for d in changes_list:
+                by_employee[d['employee']].append(d)
 
-                # Only keep the lastest for each employee
-                employee_list = []
-                for same_employee_list in list(by_employee.values()):
-                    same_employee_list = sorted(same_employee_list, key=lambda x: x['time'], reverse=True)
-                    same_employee_list = [same_employee_list[0]] if same_employee_list else []
-                    employee_list.extend(same_employee_list)
+            # Only keep the lastest for each employee
+            employee_list = []
+            for same_employee_list in list(by_employee.values()):
+                same_employee_list = sorted(same_employee_list, key=lambda x: x['time'], reverse=True)
+                same_employee_list = [same_employee_list[0]] if same_employee_list else []
+                employee_list.extend(same_employee_list)
 
-                if len(employee_list) > 0:
-                    payload_employee = self._get_payload('employee_dq_number')
-                    for employee in employee_list:
-                        payload_employee_with_params = self._set_params(payload_employee, {'uuid': employee['employee']})
-                        r = self._make_post_request(payload_employee_with_params)
-                        if r.ok:
-                            json_res = r.json()
-                            if len(json_res['queryResults'][0]['instances']) > 0:
-                                first_res = json_res['queryResults'][0]['instances'][0]
-                                # Check employee is active
-                                if first_res['state'] == 'STATE_ACTIVE' and len(first_res['typeRefs']) > 0:
-                                    for relation in first_res['typeRefs']:
-                                        if relation['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
-                                            # Check if relation to admin unit is correct
-                                            if relation['refObjIdentity']['uuid'] == employee['admunit']:
-                                                if len(first_res["inTypeRefs"]) > 0:
-                                                    for ref in first_res["inTypeRefs"]:
-                                                        if ref['refObjTypeUserKey'] == 'APOS-Types-User':
-                                                            # Add employee to dictionary with key DQ number and value admin unit UUID
-                                                            employee_changed_list.append({'user': ref['refObjIdentity']['userKey'], 'organizations': [employee['admunit']] + adm_org_units_with_employees[employee['admunit']]})
-                logger.info(f'Got employee changes in {str(timedelta(seconds=(time.time() - start)))}')
-                return employee_changed_list
-            else:
-                raise Exception('Failed to get employee changes from delta.')
+            if len(employee_list) > 0:
+                payload_employee = self._get_payload('employee_dq_number')
+                for employee in employee_list:
+                    payload_employee_with_params = self._set_params(payload_employee, {'uuid': employee['employee']})
+                    r = self._make_post_request(payload_employee_with_params)
+                    r.raise_for_status()
+                    json_res = r.json()
+                    if len(json_res['queryResults'][0]['instances']) > 0:
+                        first_res = json_res['queryResults'][0]['instances'][0]
+                        # Check employee is active
+                        if first_res['state'] == 'STATE_ACTIVE' and len(first_res['typeRefs']) > 0:
+                            for relation in first_res['typeRefs']:
+                                if relation['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
+                                    # Check if relation to admin unit is correct
+                                    if relation['refObjIdentity']['uuid'] == employee['admunit']:
+                                        if len(first_res["inTypeRefs"]) > 0:
+                                            for ref in first_res["inTypeRefs"]:
+                                                if ref['refObjTypeUserKey'] == 'APOS-Types-User':
+                                                    # Add employee to dictionary with key DQ number and value admin unit UUID
+                                                    employee_changed_list.append({'user': ref['refObjIdentity']['userKey'], 'organizations': [employee['admunit']] + adm_org_units_with_employees[employee['admunit']]})
+            logger.info(f'Got employee changes in {str(timedelta(seconds=(time.time() - start)))}')
+            return employee_changed_list
 
         except Exception as e:
             logger.error(f'Error getting employee changes: {e}')
