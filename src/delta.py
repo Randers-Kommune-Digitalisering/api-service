@@ -58,7 +58,7 @@ class DeltaClient:
     def _make_post_request(self, payload):
         cert_data, cert_pass = self._get_cert_data_and_pass()
         if cert_data and cert_pass:
-            # try:
+            try:
                 path = '/query' if 'queries' in payload else '/graph-query' if 'graphQueries' in payload else '/history' if 'queryList' in payload else None
                 if not path:
                     logger.error('Payload is invalid.')
@@ -66,8 +66,8 @@ class DeltaClient:
                 url = self.base_url.rstrip('/') + path
                 response = requests_pkcs12.post(url, data=payload, headers=self.headers, pkcs12_data=cert_data, pkcs12_password=cert_pass)
                 return response
-            # except Exception as e::
-                # logger.error(f'Error making POST request: {e}')
+            except Exception as e:
+                logger.error(f'Error making POST request: {e}')
         else:
             logger.error('Certificate path or password is invalid.')
         return
@@ -82,15 +82,15 @@ class DeltaClient:
                     self._recursive_get_adm_org_units([child], list_of_adm_units)
 
     def _check_has_employees_and_add_sub_adm_org_units(self, adm_org_list, payload):
-        adm_org_dict = {}
-        for adm_org in adm_org_list:
-            payload_with_params = self._set_params(payload, {'uuid': adm_org})
-            if not payload_with_params:
-                logger.error('Error setting payload params.')
-                return
-            r = self._make_post_request(payload_with_params)
-
-            if r.ok:
+        try:
+            adm_org_dict = {}
+            for adm_org in adm_org_list:
+                payload_with_params = self._set_params(payload, {'uuid': adm_org})
+                if not payload_with_params:
+                    logger.error('Error setting payload params.')
+                    return
+                r = self._make_post_request(payload_with_params)
+                r.raise_for_status()
                 json_res = r.json()
                 if len(json_res['graphQueryResult'][0]['instances']) > 0:
                     sub_adm_orgs = []
@@ -98,21 +98,24 @@ class DeltaClient:
                     sub_adm_orgs = [e for e in sub_adm_orgs if e != adm_org]
                     adm_org_dict[adm_org] = sub_adm_orgs
 
-        # Deletes adm. org. units with sub adm. org. units with employees
-        keys_to_remove = []
-        for key, value in adm_org_dict.items():
-            for sub_adm_org in value:
-                if sub_adm_org in adm_org_dict.keys() and key not in keys_to_remove:
-                    keys_to_remove.append(key)
-                    break
+            # Deletes adm. org. units with sub adm. org. units with employees
+            keys_to_remove = []
+            for key, value in adm_org_dict.items():
+                for sub_adm_org in value:
+                    if sub_adm_org in adm_org_dict.keys() and key not in keys_to_remove:
+                        keys_to_remove.append(key)
+                        break
 
-        for key in keys_to_remove:
-            adm_org_dict.pop(key)
+            for key in keys_to_remove:
+                adm_org_dict.pop(key)
 
-        return adm_org_dict
+            return adm_org_dict
+        except Exception as e:
+            logger.error(f'Error checking sub adm. org. and employees: {e}')
+            return
 
     def _get_adm_org_list(self):
-        # try:
+        try:
             payload = self._get_payload('adm_org_tree')
             payload_with_params = self._set_params(payload, {'uuid': self.top_adm_org_uuid})
             if not payload_with_params:
@@ -126,12 +129,12 @@ class DeltaClient:
                 self._recursive_get_adm_org_units(json_res['graphQueryResult'][0]['instances'], adm_org_list)
                 payload = self._get_payload('adm_ord_with_employees_two_layers_down')
                 return self._check_has_employees_and_add_sub_adm_org_units(adm_org_list, payload)
-        # except Exception as e::
-            # logger.error(f'Error getting adm. org. list: {e}')
+        except Exception as e:
+            logger.error(f'Error getting adm. org. list: {e}')
             return
 
     def _update_job(self):
-        logger.info(f'Updating adm. org. list')
+        logger.info('Updating adm. org. list')
         start = time.time()
         adm_org_list = self._get_adm_org_list()
         if adm_org_list:
@@ -162,11 +165,11 @@ class DeltaClient:
 
     # Returns a list of dictionaries with key 'user' containing DQ-numberand key 'organizations' containing a list of UUIDs for organizations they need access to
     def get_employees_changed(self, time_back_minutes=30):
-        # try:
+        try:
             adm_org_units_with_employees = self.get_adm_org_lists()
             if not adm_org_units_with_employees:
                 raise Exception('Error getting adm. org. units with employees.')
-            
+
             start = time.time()
             payload_changes = self._get_payload('employee_changes')
 
@@ -230,6 +233,6 @@ class DeltaClient:
             logger.info(f'Got employee changes in {str(timedelta(seconds=(time.time() - start)))}')
             return employee_changed_list
 
-        # except Exception as e::
-            # logger.error(f'Error getting employee changes: {e}')
+        except Exception as e:
+            logger.error(f'Error getting employee changes: {e}')
             return
