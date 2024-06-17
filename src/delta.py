@@ -58,7 +58,7 @@ class DeltaClient:
     def _make_post_request(self, payload):
         cert_data, cert_pass = self._get_cert_data_and_pass()
         if cert_data and cert_pass:
-            try:
+            # try:
                 path = '/query' if 'queries' in payload else '/graph-query' if 'graphQueries' in payload else '/history' if 'queryList' in payload else None
                 if not path:
                     logger.error('Payload is invalid.')
@@ -66,7 +66,7 @@ class DeltaClient:
                 url = self.base_url.rstrip('/') + path
                 response = requests_pkcs12.post(url, data=payload, headers=self.headers, pkcs12_data=cert_data, pkcs12_password=cert_pass)
                 return response
-            except Exception as e:
+            # except Exception as e::
                 logger.error(f'Error making POST request: {e}')
         else:
             logger.error('Certificate path or password is invalid.')
@@ -112,7 +112,7 @@ class DeltaClient:
         return adm_org_dict
 
     def _get_adm_org_list(self):
-        try:
+        # try:
             payload = self._get_payload('adm_org_tree')
             payload_with_params = self._set_params(payload, {'uuid': self.top_adm_org_uuid})
             if not payload_with_params:
@@ -126,7 +126,7 @@ class DeltaClient:
                     self._recursive_get_adm_org_units(json_res['graphQueryResult'][0]['instances'], adm_org_list)
                     payload = self._get_payload('adm_ord_with_employees_two_layers_down')
                     return self._check_has_employees_and_add_sub_adm_org_units(adm_org_list, payload)
-        except Exception as e:
+        # except Exception as e::
             logger.error(f'Error getting adm. org. list: {e}')
             return
 
@@ -159,7 +159,7 @@ class DeltaClient:
 
     # Returns a list of dictionaries with key 'user' containing DQ-numberand key 'organizations' containing a list of UUIDs for organizations they need access to
     def get_employees_changed(self, time_back_minutes=30):
-        try:
+        # try:
             adm_org_units_with_employees = self.get_adm_org_lists()
             start = time.time()
             payload_changes = self._get_payload('employee_changes')
@@ -226,6 +226,6 @@ class DeltaClient:
             else:
                 raise Exception('Failed to get employee changes from delta.')
 
-        except Exception as e:
+        # except Exception as e::
             logger.error(f'Error getting employee changes: {e}')
             return
