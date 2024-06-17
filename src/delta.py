@@ -67,7 +67,7 @@ class DeltaClient:
                 response = requests_pkcs12.post(url, data=payload, headers=self.headers, pkcs12_data=cert_data, pkcs12_password=cert_pass)
                 return response
             # except Exception as e::
-                logger.error(f'Error making POST request: {e}')
+                # logger.error(f'Error making POST request: {e}')
         else:
             logger.error('Certificate path or password is invalid.')
         return
@@ -127,7 +127,7 @@ class DeltaClient:
                     payload = self._get_payload('adm_ord_with_employees_two_layers_down')
                     return self._check_has_employees_and_add_sub_adm_org_units(adm_org_list, payload)
         # except Exception as e::
-            logger.error(f'Error getting adm. org. list: {e}')
+            # logger.error(f'Error getting adm. org. list: {e}')
             return
 
     def _update_job(self):
@@ -227,5 +227,5 @@ class DeltaClient:
                 raise Exception('Failed to get employee changes from delta.')
 
         # except Exception as e::
-            logger.error(f'Error getting employee changes: {e}')
+            # logger.error(f'Error getting employee changes: {e}')
             return
