@@ -32,9 +32,9 @@ class NexusRequest:
         if self.method == 'GET':
             response = nexus_client.get_request(final_url)
         elif self.method == 'POST':
-            response = nexus_client.post_request(final_url, data=self.json_body)
+            response = nexus_client.post_request(final_url, json=self.json_body)
         elif self.method == 'PUT':
-            response = nexus_client.put_request(final_url, data=self.json_body)
+            response = nexus_client.put_request(final_url, json=self.json_body)
         elif self.method == 'DELETE':
             response = nexus_client.delete_request(final_url)
         else:
