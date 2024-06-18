@@ -15,10 +15,11 @@ def execute_lukning(cpr: str):
         if not patient:
             return
 
-        # _cancel_events(patient)
-        # _set_conditions_inactive(patient)
-        _set_pathways_inactive(patient)
+        _cancel_events(patient)
+        #_set_conditions_inactive(patient)
+        # _set_pathways_inactive(patient)
         #
+        # _remove_patient_grants([2298969])
 
     except Exception as e:
         logger.error(f"Error in job: {e}")
@@ -34,7 +35,6 @@ def _fetch_patient_by_query(query):
 
 
 def _cancel_events(patient):
-
     # Fetch patient preferences
     request1 = NexusRequest(input_response=patient, link_href="patientPreferences", method="GET")
 
@@ -136,9 +136,43 @@ def _set_conditions_inactive(patient):
     execute_nexus_flow([request1])
 
 
-def _set_pathways_inactive(patient):
-    
+def _set_pathway_inactive(pathway_id):
+
+    return
+
+
+def _remove_patient_grants(grant_id):
+    # Hardcoded value to open the Afslut window for grants/tilstande
+    grant_afslut_id = 418
+
+    # Home resource
+    home_res = nexus_client.home_resource()
+
+    for id in grant_id:
+        # Get patient grant by id
+        patient_grant = nexus_client.get_request(home_res["_links"]["patientGrantById"]["href"] + "/" + str(id))
+
+        # Fetch afslut object by grant_afslut_id
+        afslut_object = next(item for item in patient_grant["currentWorkflowTransitions"]
+                             if item["id"] == grant_afslut_id)
+
+        # Open the afslut window
+        afslut_window = NexusRequest(input_response=afslut_object,
+                                        link_href="prepareEdit",
+                                        method="GET")
+        afslut_window_response = execute_nexus_flow([afslut_window])
+
+
+
+        # Save the edit, thus removing the grant
+        save_afslut_window = NexusRequest(input_response=afslut_window_response,link_href="save",
+                                        method="POST",
+                                        json_body=afslut_window_response)
+
+        remove_patient_grants_flow = [save_afslut_window]
+
+        execute_nexus_flow(remove_patient_grants_flow)
 
 
 if __name__ == '__main__':
-    execute_lukning("111131-1112")
+  execute_lukning("111131-1112")
