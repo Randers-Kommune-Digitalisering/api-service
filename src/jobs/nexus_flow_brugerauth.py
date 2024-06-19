@@ -52,11 +52,11 @@ def execute_brugerauth(active_org_list: list, primary_identifier: str, input_org
             logger.info(f'Professional {primary_identifier} updated with organisations')
         else:
             logger.info(f'Professional {primary_identifier} already has all organisations - not updating')
-        
+
         # Get top organisation's supplier
         current = next((item for item in active_org_list if item['sync_id'] == input_organisation_uuid_list[0]), None)
         supplier = current.get('supplier')
-        
+
         # If it has a supplier update it
         if supplier:
             if _update_professional_supplier(professional, supplier, primary_identifier):
