@@ -180,4 +180,3 @@ def _add_supplier_ids(organisation_ids: list, suppliers: list):
         supplier = next((item for item in suppliers if item.get('organizationId') == org['id']), None)
         org['supplier'] = supplier
     return organisation_ids
-
