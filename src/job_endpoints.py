@@ -48,12 +48,14 @@ def start_job(job_name):
             logger.info(f'Starting job: {job_name}')
             start = time.time()
             if job():
+                logger.info(f'Finished job: {job_name} in {str(timedelta(seconds=time.time() - start))}')
                 return jsonify({
                     'success': True,
                     'message': f'{job_name} finished',
                     'time': str(timedelta(seconds=time.time() - start))
                 }), 200
             else:
+                logger.error(f'Failed job: {job_name} in {str(timedelta(seconds=time.time() - start))}')
                 return jsonify({
                     'success': False,
                     'message': f'{job_name} failed',

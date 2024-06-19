@@ -140,6 +140,7 @@ class DeltaClient:
         if adm_org_list:
             self.adm_org_list = adm_org_list
             self.last_adm_org_list_updated = datetime.now()
+            logger.info(f'Administrative organizations {len(self.adm_org_list)}')
             logger.info(f'Adm. org. list updated in {str(timedelta(seconds=(time.time() - start)))}')
         else:
             logger.error('Error adm. org. list not updated.')
@@ -230,6 +231,8 @@ class DeltaClient:
                                                 if ref['refObjTypeUserKey'] == 'APOS-Types-User':
                                                     # Add employee to dictionary with key DQ number and value admin unit UUID
                                                     employee_changed_list.append({'user': ref['refObjIdentity']['userKey'], 'organizations': [employee['admunit']] + adm_org_units_with_employees[employee['admunit']]})
+
+            logger.info(f'Employees with changes {len(employee_changed_list)}')
             logger.info(f'Got employee changes in {str(timedelta(seconds=(time.time() - start)))}')
             return employee_changed_list
 

@@ -14,7 +14,8 @@ def job():
     try:
         active_org_list = _fetch_all_active_organisations()
         employees_changed_list = delta_client.get_employees_changed()
-        for employee in employees_changed_list:
+        for index, employee in enumerate(employees_changed_list):
+            logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
             execute_brugerauth(active_org_list, employee['user'], employee['organizations'])
         return True
     except Exception as e:
@@ -25,7 +26,7 @@ def job():
 def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list):
     professional = _fetch_professional(primary_identifier)
     if not professional:
-        return
+        logger.error(f"Professional {primary_identifier} not found")
 
     # Get all assigned organisations for professional as list of dicts - [0] being id, [1] being uuid
     professional_org_list = _fetch_professional_org_syncIds(professional)
@@ -35,31 +36,35 @@ def execute_brugerauth(active_org_list: list, primary_identifier: str, input_org
     unassigned_organisation_ids = [item['id'] for item in active_org_list if item['sync_id'] in input_organisation_uuid_list]
 
     if len(unassigned_organisation_ids) == 0:
-        return
+        logger.error(f"No organizations found for professional {primary_identifier}")
 
     # Filter out IDs present in professional_org_list
     unassigned_organisation_ids = [org_id for org_id in unassigned_organisation_ids if org_id not in [item['id'] for item in professional_org_list]]
-    if len(unassigned_organisation_ids) == 0:
-        return
 
     # Remove duplicates
     unassigned_organisation_ids = list(set(unassigned_organisation_ids))
     # logger.info(f"Professional unassigned organisation: {unassigned_organisation_ids}")
 
     try:
-        # Update the organisations for the professional
-        if _update_professional_organisations(professional, unassigned_organisation_ids):
+        if len(unassigned_organisation_ids) > 0:
+            # Update the organisations for the professional
+            _update_professional_organisations(professional, unassigned_organisation_ids)
             logger.info(f'Professional {primary_identifier} updated with organisations')
-
-        # Gte top organisation's supplier
+        else:
+            logger.info(f'Professional {primary_identifier} already has all organisations - not updating')
+        
+        # Get top organisation's supplier
         current = next((item for item in active_org_list if item['sync_id'] == input_organisation_uuid_list[0]), None)
         supplier = current.get('supplier')
+        
         # If it has a supplier update it
         if supplier:
-            if _update_professional_supplier(professional, supplier):
+            if _update_professional_supplier(professional, supplier, primary_identifier):
                 logger.info(f"Professional {primary_identifier} updated with supplier")
+        else:
+            logger.info(f'Top organisation for professional {primary_identifier} has a  no supplier - not updating')
 
-        logger.info(f'Professional {primary_identifier} updated')
+        logger.info(f'Professional {primary_identifier} updated sucessfully')
     except Exception as e:
         logger.error(f'Failed to update professional {primary_identifier}: {e}')
 
@@ -94,7 +99,7 @@ def _update_professional_organisations(professional, organisation_id_list):
     return professional_org_change_list
 
 
-def _update_professional_supplier(professional, supplier):
+def _update_professional_supplier(professional, supplier, primary_identifier):
     # Professional self
     request = NexusRequest(input_response=professional, link_href="self", method="GET")
     professional_self = execute_nexus_flow([request])
@@ -108,6 +113,8 @@ def _update_professional_supplier(professional, supplier):
         professional_config['defaultOrganizationSupplier'] = supplier
         request = NexusRequest(input_response=professional_config, link_href='update', method='PUT', json_body=professional_config)
         return execute_nexus_flow([request])
+    else:
+        logger.info(f'Professional {primary_identifier} already has a supplier - not updating')
 
 
 def _fetch_professional_org_syncIds(professional):
