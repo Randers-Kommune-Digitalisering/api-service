@@ -104,6 +104,9 @@ class APIClient:
             try:
                 return response.json()
             except json.JSONDecodeError:
+                # If the response is empty, return 'success'
+                if not response.content:
+                    return 'success'
                 # If the response is not JSON, return the response content directly
                 return response.content
 

@@ -48,8 +48,10 @@ def execute_brugerauth(active_org_list: list, primary_identifier: str, input_org
     try:
         if len(unassigned_organisation_ids) > 0:
             # Update the organisations for the professional
-            _update_professional_organisations(professional, unassigned_organisation_ids)
-            logger.info(f'Professional {primary_identifier} updated with organisations')
+            if _update_professional_organisations(professional, unassigned_organisation_ids):
+                logger.info(f'Professional {primary_identifier} updated with organisations')
+            else:
+                logger.error(f'Failed to update professional {primary_identifier} with organisations')
         else:
             logger.info(f'Professional {primary_identifier} already has all organisations - not updating')
 
@@ -61,6 +63,8 @@ def execute_brugerauth(active_org_list: list, primary_identifier: str, input_org
         if supplier:
             if _update_professional_supplier(professional, supplier, primary_identifier):
                 logger.info(f"Professional {primary_identifier} updated with supplier")
+            else:
+                logger.error(f"Failed to update professional {primary_identifier} with supplier")
         else:
             logger.info(f'Top organisation for professional {primary_identifier} has a  no supplier - not updating')
 
