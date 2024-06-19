@@ -1,6 +1,6 @@
 import logging
 
-from nexus.nexus_request import NexusRequest, execute_nexus_flow
+# from nexus.nexus_request import NexusRequest, execute_nexus_flow
 from nexus.nexus_client import NEXUSClient
 from flask import Blueprint, request, jsonify
 
@@ -9,9 +9,9 @@ nexus_client = NEXUSClient()
 
 api_bp = Blueprint('api', __name__)
 
+
 @api_bp.route('/api/fetch_lendings', methods=['POST'])
 def fetch_lendings_endpoint():
-
     data = request.get_json()
     cpr = data.get('cpr')
     if not cpr:

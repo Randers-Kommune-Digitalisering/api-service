@@ -6,7 +6,7 @@ from utils.logging import set_logging_configuration, APP_RUNNING
 from utils.config import DEBUG, PORT, POD_NAME
 from job_endpoints import job_api_bp
 from endpoints import api_bp
-from jobs.nexus_flow_lukning import execute_lukning
+# from jobs.nexus_flow_lukning import execute_lukning
 
 
 def create_app():

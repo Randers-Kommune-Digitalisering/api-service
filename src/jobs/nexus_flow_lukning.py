@@ -153,11 +153,10 @@ def _remove_patient_grants(grant_id):
                                      method="GET")
         afslut_window_response = execute_nexus_flow([afslut_window])
 
-
         # Save the edit, thus removing the grant
-        save_afslut_window = NexusRequest(input_response=afslut_window_response,link_href="save",
-                                     method="POST",
-                                     json_body=afslut_window_response)
+        save_afslut_window = NexusRequest(input_response=afslut_window_response, link_href="save",
+                                          method="POST",
+                                          json_body=afslut_window_response)
 
         remove_patient_grants_flow = [save_afslut_window]
 

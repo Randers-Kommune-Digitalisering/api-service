@@ -151,5 +151,5 @@ def _collect_syncIds_and_ids_from_org(org: object):
 
 # Example usage
 if __name__ == "__main__":
-#    update_nexus_organisation_list()
+# update_nexus_organisation_list()
     execute_brugerauth("dqb1029", ['bb29e529-06a8-47e7-abe7-8fab6824dbf9'])
