@@ -11,27 +11,18 @@ nexus_client = NEXUSClient()
 def execute_lukning(cpr: str):
     try:
         # Find patient by CPR
-        patient = _fetch_patient_by_query(query=cpr)
+        patient = nexus_client.fetch_patient_by_query(query=cpr)
         if not patient:
             return
 
-        _cancel_events(patient)
-        #_set_conditions_inactive(patient)
+        # _cancel_events(patient)
+        _set_conditions_inactive(patient)
         # _set_pathways_inactive(patient)
         #
         # _remove_patient_grants([2298969])
 
     except Exception as e:
         logger.error(f"Error in job: {e}")
-
-
-def _fetch_patient_by_query(query):
-    patient_search = nexus_client.find_patient_by_query(query=query)
-    patient_link = patient_search['pages'][0]['_links']['patientData']['href']
-
-    patient_response = nexus_client.get_request(path=patient_link)
-    request1 = NexusRequest(input_response=patient_response[0], link_href="self", method="GET")
-    return execute_nexus_flow([request1])
 
 
 def _cancel_events(patient):
@@ -158,16 +149,15 @@ def _remove_patient_grants(grant_id):
 
         # Open the afslut window
         afslut_window = NexusRequest(input_response=afslut_object,
-                                        link_href="prepareEdit",
-                                        method="GET")
+                                     link_href="prepareEdit",
+                                     method="GET")
         afslut_window_response = execute_nexus_flow([afslut_window])
-
 
 
         # Save the edit, thus removing the grant
         save_afslut_window = NexusRequest(input_response=afslut_window_response,link_href="save",
-                                        method="POST",
-                                        json_body=afslut_window_response)
+                                     method="POST",
+                                     json_body=afslut_window_response)
 
         remove_patient_grants_flow = [save_afslut_window]
 
@@ -175,4 +165,4 @@ def _remove_patient_grants(grant_id):
 
 
 if __name__ == '__main__':
-  execute_lukning("111131-1112")
+    execute_lukning("111131-1112")

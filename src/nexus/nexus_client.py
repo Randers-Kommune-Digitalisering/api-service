@@ -148,6 +148,15 @@ class NEXUSClient:
         path = "api/core/mobile/randers/v2/professionals/?query=" + query
         return self.api_client.get(path)
 
+    def fetch_patient_by_query(self, query):
+        patient_search = self.find_patient_by_query(query=query)
+        patient_link = patient_search['pages'][0]['_links']['patientData']['href']
+
+        patient_response = self.get_request(path=patient_link)
+        self_path = patient_response[0]['_links']['self']['href']
+        patient_self_response = self.get_request(self_path)
+        return patient_self_response
+
     def find_patient_by_query(self, query):
         path = "api/core/mobile/randers/v2/patients/?query=" + query
         return self.api_client.get(path)
