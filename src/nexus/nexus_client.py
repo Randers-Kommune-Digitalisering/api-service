@@ -125,11 +125,11 @@ class APIClient:
     def get(self, path):
         return self._make_request(requests.get, path)
 
-    def post(self, path, data=None):
-        return self._make_request(requests.post, path, json=data)
+    def post(self, path, data=None, json=None):
+        return self._make_request(requests.post, path, data=data, json=json)
 
-    def put(self, path, data=None):
-        return self._make_request(requests.put, path, data=data, json=data)
+    def put(self, path, data=None, json=None):
+        return self._make_request(requests.put, path, data=data, json=json)
 
     def delete(self, path):
         return self._make_request(requests.delete, path)
@@ -164,11 +164,11 @@ class NEXUSClient:
     def get_request(self, path):
         return self.api_client.get(path)
 
-    def post_request(self, path, data):
-        return self.api_client.post(path, data=data)
+    def post_request(self, path, data=None, json=None):
+        return self.api_client.post(path, data=data, json=json)
 
-    def put_request(self, path, data):
-        return self.api_client.put(path, data=data)
+    def put_request(self, path, data=None, json=None):
+        return self.api_client.put(path, data=data, json=json)
 
     def delete_request(self, path):
         return self.api_client.delete(path)
