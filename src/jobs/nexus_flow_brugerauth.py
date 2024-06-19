@@ -174,7 +174,7 @@ def _collect_syncIds_and_ids_from_org(org: object):
         logger.info(f"Unexpected type for org: {type(org)}")
     return sync_ids_and_ids
 
-  
+
 def _add_supplier_ids(organisation_ids: list, suppliers: list):
     for org in organisation_ids:
         supplier = next((item for item in suppliers if item.get('organizationId') == org['id']), None)
