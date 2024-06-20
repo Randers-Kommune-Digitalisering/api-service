@@ -2,8 +2,7 @@ import logging
 
 from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID
 from delta import DeltaClient
-from nexus.nexus_request import NexusRequest, execute_nexus_flow
-from nexus.nexus_client import NEXUSClient
+from nexus.nexus_client import NEXUSClient, NexusRequest, execute_nexus_flow
 
 logger = logging.getLogger(__name__)
 nexus_client = NEXUSClient()
@@ -81,7 +80,7 @@ def _update_professional_organisations(professional, organisation_id_list):
     }
 
     # Proffesional organisations
-    request2 = NexusRequest(link_href="updateOrganizations", method="POST", json_body=json_body)
+    request2 = NexusRequest(link_href="updateOrganizations", method="POST", payload=json_body)
 
     # Create a list of NexusRequest objects
     professional_org_change_request_list = [
@@ -106,7 +105,7 @@ def _update_professional_supplier(professional, supplier):
     # Only update supplier if it is None/null
     if not professional_config.get('defaultOrganizationSupplier'):
         professional_config['defaultOrganizationSupplier'] = supplier
-        request = NexusRequest(input_response=professional_config, link_href='update', method='PUT', json_body=professional_config)
+        request = NexusRequest(input_response=professional_config, link_href='update', method='PUT', payload=professional_config)
         return execute_nexus_flow([request])
 
 

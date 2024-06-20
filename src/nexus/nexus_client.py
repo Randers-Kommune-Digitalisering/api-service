@@ -2,8 +2,10 @@ import logging
 import time
 import requests
 import json
+from typing import List, Optional
 
 from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
+
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +137,7 @@ class APIClient:
         return self._make_request(requests.delete, path)
 
 
-# Nexus client requests
+# Nexus client
 class NEXUSClient:
     def __init__(self):
         self.api_client = APIClient(NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
@@ -157,6 +159,28 @@ class NEXUSClient:
         patient_self_response = self.get_request(self_path)
         return patient_self_response
 
+    def fetch_borgerkalender(self, patient):
+        # Fetch patient preferences
+        request1 = NexusRequest(input_response=patient,
+                                link_href="patientPreferences",
+                                method="GET")
+
+        # Execute Patient preferences
+        patient_preferences = execute_nexus_flow([request1])
+
+        # Fetch patient list of CITIZEN_CALENDAR
+        citizen_calender_list = patient_preferences['CITIZEN_CALENDAR']
+
+        # Find the object with name "Borgerkalender"
+        borgerkalender = next((item for item in citizen_calender_list
+                               if item.get('name') == 'Borgerkalender'), None)
+
+        # Fetch CITIZEN_CALENDAR self
+        request1 = NexusRequest(input_response=borgerkalender,
+                                link_href="self",
+                                method="GET")
+        return execute_nexus_flow([request1])
+
     def find_patient_by_query(self, query):
         path = "api/core/mobile/randers/v2/patients/?query=" + query
         return self.api_client.get(path)
@@ -172,3 +196,88 @@ class NEXUSClient:
 
     def delete_request(self, path):
         return self.api_client.delete(path)
+
+
+# Create an instance of NEXUSClient
+nexus_client = NEXUSClient()
+
+
+class NexusRequest:
+    def __init__(self, method: str, link_href: str = None, link_full: list = None,
+                 input_response: Optional[dict] = None, payload: Optional[dict] = None,
+                 params: Optional[dict] = None):
+        self.input_response = input_response
+        self.link_href = link_href
+        self.method = method
+        self.payload = payload
+        self.link_full = link_full
+        self.params = params
+
+    def __repr__(self):
+        return f"NexusRequest(href={self.link_href}, method={self.method}, json_body={self.payload})"
+
+    def execute(self, input_response):
+        final_url = None
+
+        # Parse the key from the constructor's input response using link_href
+        if self.input_response and '_links' in self.input_response and self.link_href in self.input_response['_links']:
+            final_url = self.input_response['_links'][self.link_href]['href']
+
+        # Parse the key from the constructor's input response using link_full
+        elif self.input_response and self.link_full:
+            final_url = self._get_nested_value(self.input_response, self.link_full)
+            print("Extracted URL from link_full:", final_url)
+
+        # Parse the key from the formal parameter input response using link_href
+        elif input_response and '_links' in input_response and self.link_href in input_response['_links']:
+            final_url = input_response['_links'][self.link_href]['href']
+
+        # Parse the key from the formal parameter input response using link_full
+        elif input_response and self.link_full:
+            final_url = self._get_nested_value(input_response, self.link_full)
+            print("Extracted URL from link_full:", final_url)
+
+        if not final_url:
+            raise ValueError(f"Link '{self.link_href}' not found in the response")
+
+        if not isinstance(final_url, str):
+            raise ValueError(f"Final URL is not a string: {final_url}")
+
+        # Handle URL parameters
+        if self.params:
+            final_url += '?' + '&'.join([f"{key}={value}" for key, value in self.params.items()])
+
+        if self.method == 'GET':
+            response = nexus_client.get_request(final_url)
+        elif self.method == 'POST':
+            response = nexus_client.post_request(final_url, json=self.payload)
+        elif self.method == 'PUT':
+            response = nexus_client.put_request(final_url, json=self.payload)
+        elif self.method == 'DELETE':
+            response = nexus_client.delete_request(final_url)
+        else:
+            raise ValueError(f"Unsupported method: {self.method}")
+
+        return response
+
+    def _get_nested_value(self, data, keys):
+        # Recursively get nested value from a dictionary using a list of keys.
+        for key in keys:
+            if isinstance(data, dict) and key in data:
+                data = data[key]
+            else:
+                return None
+        return data
+
+    def process_response(self, response_json, nexus_request):
+        return
+        # print("Processing " +  nexus_request.link_href)
+
+
+def execute_nexus_flow(list_of_requests: List[NexusRequest]):
+    cur_response = None
+    for request in list_of_requests:
+        response = request.execute(cur_response)
+        request.process_response(response, request)
+        cur_response = response
+    return cur_response
