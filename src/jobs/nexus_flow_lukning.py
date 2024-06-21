@@ -5,6 +5,7 @@ from nexus.nexus_client import NEXUSClient, NexusRequest, execute_nexus_flow
 logger = logging.getLogger(__name__)
 nexus_client = NEXUSClient()
 
+
 def execute_lukning(cpr: str):
     try:
         # Find patient by CPR
@@ -20,6 +21,7 @@ def execute_lukning(cpr: str):
 
     except Exception as e:
         logger.error(f"Error in job: {e}")
+
 
 def _cancel_events(patient):
     try:
@@ -53,11 +55,11 @@ def _cancel_events(patient):
 
         # Execute cancel events
         response = execute_nexus_flow([request1])
-        logger.info(f"Events cancelled")
+        logger.info("Events cancelled")
         return response
 
     except Exception as e:
-        logger.error(f"Error cancelling events: {e}")
+        logger.error("Error cancelling events: {e}")
 
 def _set_conditions_inactive(patient):
     try:
@@ -119,7 +121,7 @@ def _set_conditions_inactive(patient):
 
         # Execute condition observation - active conditions are set to inactive
         response = execute_nexus_flow([request1])
-        logger.info(f"Conditions set to inactive")
+        logger.info("Conditions set to inactive")
         return response
 
     except Exception as e:
@@ -175,11 +177,12 @@ def _set_pathways_inactive(patient):
                                     link_href="updateFormData",
                                     method="PUT", payload=pathway_reference)
             response = execute_nexus_flow([request1])
-            logger.info(f"Pathway set to inactive")
+            logger.info("Pathway set to inactive")
         return True
 
     except Exception as e:
         logger.error(f"Error setting pathways inactive: {e}")
+
 
 def _remove_basket_grants(patient):
     borgerkalender = nexus_client.fetch_borgerkalender(patient)
@@ -197,6 +200,7 @@ def _remove_basket_grants(patient):
         # TODO "Kun plantlagt, ikke bestilt"?
 
     return
+
 
 def _remove_patient_grants(grant_id):
     try:
@@ -225,7 +229,7 @@ def _remove_patient_grants(grant_id):
                                               method="POST",
                                               payload=afslut_window_response)
             response = execute_nexus_flow([save_afslut_window])
-            logger.info(f"Grant removed")
+            logger.info("Grant removed")
         return True
 
     except Exception as e:
