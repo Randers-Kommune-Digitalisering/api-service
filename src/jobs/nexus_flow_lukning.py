@@ -59,7 +59,8 @@ def _cancel_events(patient):
         return response
 
     except Exception as e:
-        logger.error("Error cancelling events: {e}")
+        logger.error(f"Error cancelling events: {e}")
+
 
 def _set_conditions_inactive(patient):
     try:
@@ -127,6 +128,7 @@ def _set_conditions_inactive(patient):
     except Exception as e:
         logger.error(f"Error setting conditions inactive: {e}")
 
+
 def _set_pathways_inactive(patient):
     try:
         afslutning_af_borger_dashboard_id = 6866
@@ -176,7 +178,7 @@ def _set_pathways_inactive(patient):
             request1 = NexusRequest(input_response=inactive_action,
                                     link_href="updateFormData",
                                     method="PUT", payload=pathway_reference)
-            response = execute_nexus_flow([request1])
+            execute_nexus_flow([request1])
             logger.info("Pathway set to inactive")
         return True
 
@@ -194,8 +196,8 @@ def _remove_basket_grants(patient):
 
     for grant in basket_grants['pages']:
         request1 = NexusRequest(input_response=grant,
-                            link_href="basketGrants",
-                            method="GET")
+                                link_href="basketGrants",
+                                method="GET")
         execute_nexus_flow([request1])
         # TODO "Kun plantlagt, ikke bestilt"?
 
@@ -228,7 +230,7 @@ def _remove_patient_grants(grant_id):
             save_afslut_window = NexusRequest(input_response=afslut_window_response, link_href="save",
                                               method="POST",
                                               payload=afslut_window_response)
-            response = execute_nexus_flow([save_afslut_window])
+            execute_nexus_flow([save_afslut_window])
             logger.info("Grant removed")
         return True
 
