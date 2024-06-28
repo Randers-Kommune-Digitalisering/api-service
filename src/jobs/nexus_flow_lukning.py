@@ -1,9 +1,10 @@
 import logging
 from datetime import datetime
-from nexus.nexus_client import NEXUSClient, NexusRequest, execute_nexus_flow
+from nexus.nexus_client import NexusClient, NexusRequest, execute_nexus_flow
+from utils.config import NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
-nexus_client = NEXUSClient()
+nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
 
 
 def execute_lukning(cpr: str):
@@ -15,8 +16,8 @@ def execute_lukning(cpr: str):
             return
 
         _cancel_events(patient)
-        # _set_conditions_inactive(patient)
-        # _set_pathways_inactive(patient)
+        _set_conditions_inactive(patient)
+        _set_pathways_inactive(patient)
         # _remove_patient_grants([2298969])
 
     except Exception as e:
