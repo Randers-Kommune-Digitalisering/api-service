@@ -161,7 +161,7 @@ class NexusClient:
         return self.api_client.get(path)
 
     def post_request(self, path, data=None, json=None):
-        return self.api_client.post(path,data, json)
+        return self.api_client.post(path, data, json)
 
     def put_request(self, path, data=None, json=None):
         return self.api_client.put(path, data, json)
