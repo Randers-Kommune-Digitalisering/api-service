@@ -7,18 +7,23 @@ nexus_client = NEXUSClient()
 
 
 def execute_lukning(cpr: str):
+    afslutning_af_borger_dashboard_id = 6866
     try:
         # Find patient by CPR
         patient = nexus_client.fetch_patient_by_query(query=cpr)
         if not patient:
             logger.error("Patient not found.")
             return
+        dashboard = nexus_client.fetch_dashboard(patient, afslutning_af_borger_dashboard_id)
+        if not dashboard:
+            logger.error("Dashboard not found.")
+            return
 
-        # _cancel_events(patient)
-        # _set_conditions_inactive(patient)
-        # _set_pathways_inactive(patient)
-        _remove_basket_grants(patient)
-        # _remove_patient_grants([2298969])
+        #_cancel_events(patient)
+        #_set_conditions_inactive(patient)
+        # _set_pathways_inactive(dashboard)
+        _remove_basket_grants(patient, dashboard)
+        #_remove_patient_grants([2298977])
 
     except Exception as e:
         logger.error(f"Error in job: {e}")
@@ -130,35 +135,24 @@ def _set_conditions_inactive(patient):
         logger.error(f"Error setting conditions inactive: {e}")
 
 
-def _set_pathways_inactive(patient):
+def _set_pathways_inactive(dashboard):
     try:
-        afslutning_af_borger_dashboard_id = 6866
         pathway_collection_header_title = ["Alle borgers Handlingsanvisninger", "Skemaer - afslutning af borger"]
-        set_pathway_inactive_action_id = 37102
+        set_pathway_inactive_action_id = [30504, 37102]
         set_form_inactive_action_id = 30504
-
-        # patient preferences
-        request1 = NexusRequest(input_response=patient,
-                                link_href="patientPreferences",
-                                method="GET")
-        patient_preferences = execute_nexus_flow([request1])
-
-        # Reference to Citizen dashboard for "Afslutning af borger"
-        citizen_dashboard_afslutning = next((item for item in patient_preferences["CITIZEN_DASHBOARD"] if
-                                            item['id'] == afslutning_af_borger_dashboard_id), None)
-
-        # Self object for Citizen dashboard for "Afslutning af borger"
-        request1 = NexusRequest(input_response=citizen_dashboard_afslutning,
-                                link_href="self",
-                                method="GET")
-        citizen_dashboard_afslutning = execute_nexus_flow([request1])
+        exclude_pathway_names = ["Akutkald"]
 
         # Fetch the pathway collection matching the header title
-        patient_pathway_collection = [item for item in citizen_dashboard_afslutning['view']['widgets'] if
+        patient_pathway_collection = [item for item in dashboard['view']['widgets'] if
                                       item['headerTitle'] in pathway_collection_header_title]
+
+        if not patient_pathway_collection:
+            logger.error("No pathway collections matching the header titles found.")
+            return False
 
         # Iterate over the pathway collection, and find pathway references
         for pathway in patient_pathway_collection:
+
             # Check if the pathway has patient activities
             if 'patientActivities' in pathway['_links']:
                 # Patient activities
@@ -183,7 +177,7 @@ def _set_pathways_inactive(patient):
 
                     # Fetch the inactive action object
                     inactive_action = next(item for item in available_actions
-                                           if item['id'] == set_form_inactive_action_id)
+                                           if item['id'] in set_pathway_inactive_action_id)
                     request1 = NexusRequest(input_response=inactive_action,
                                             link_href="updateFormData",
                                             method="PUT", payload=activity_self)
@@ -197,6 +191,10 @@ def _set_pathways_inactive(patient):
 
             # Iterate over the pathway references, and set status to inactive
             for reference in pathway_references:
+                # Skip pathway that should not be set inactive
+                if reference['name'] in exclude_pathway_names:
+                    logger.info(f"Skipping pathway: {reference['name']}")
+                    continue
                 # Fetch referenced object of the current pathway
                 request2 = NexusRequest(input_response=reference,
                                         link_href="referencedObject",
@@ -210,7 +208,7 @@ def _set_pathways_inactive(patient):
                 available_actions = execute_nexus_flow([request1])
 
                 # Fetch the inactive action object
-                inactive_action = next(item for item in available_actions if item['id'] == set_pathway_inactive_action_id)
+                inactive_action = next(item for item in available_actions if item['id'] in set_pathway_inactive_action_id)
                 request1 = NexusRequest(input_response=inactive_action,
                                         link_href="updateFormData",
                                         method="PUT", payload=pathway_reference)
@@ -222,8 +220,8 @@ def _set_pathways_inactive(patient):
         logger.error(f"Error setting pathways inactive: {e}")
 
 
-def _remove_basket_grants(patient):
-    # TODO "Kun plantlagt, ikke bestilt"?
+def _remove_basket_grants(patient, dashboard):
+    pathway_collection_header_title = ["Ikke-visiteret"]
     try:
         remove_basket_remove_action_id = 402
         borgerkalender = nexus_client.fetch_borgerkalender(patient)
@@ -256,27 +254,42 @@ def _remove_basket_grants(patient):
                                                     method="PUT", payload=[])
                             execute_nexus_flow([request1])
 
-        logger.info("Basket grants removing")
+        basket_grants = next((item for item in dashboard['view']['widgets'] if
+                             item['headerTitle'] in pathway_collection_header_title), None)
+
+        request1 = NexusRequest(input_response=basket_grants,
+                                link_href="pathwayReferences",
+                                method="GET")
+        pathway_references = execute_nexus_flow([request1])
+        for basket_references in pathway_references:
+            grant_references = basket_references['children']
+            for grant_reference in grant_references:
+                if not grant_reference['grantId']:
+                    continue
+
+                _remove_patient_grants([grant_reference['grantId']])
+
+        logger.info("Basket grants removed")
         return True
     except Exception as e:
         logger.error(f"Error removing basket grants: {e}")
 
 
-def _remove_patient_grants(grant_id):
+def _remove_patient_grants(grant_ids: list):
     try:
         # Hardcoded value to open the Afslut window for grants/tilstande
-        grant_afslut_id = 418
+        grant_afslut_id = [418, 502]
 
         # Home resource
         home_res = nexus_client.home_resource()
 
-        for id in grant_id:
+        for id in grant_ids:
             # Get patient grant by id
             patient_grant = nexus_client.get_request(home_res["_links"]["patientGrantById"]["href"] + "/" + str(id))
 
             # Fetch afslut object by grant_afslut_id
             afslut_object = next(item for item in patient_grant["currentWorkflowTransitions"]
-                                 if item["id"] == grant_afslut_id)
+                                 if item["id"] in grant_afslut_id)
 
             # Open the afslut window
             afslut_window = NexusRequest(input_response=afslut_object,
@@ -289,7 +302,7 @@ def _remove_patient_grants(grant_id):
                                               method="POST",
                                               payload=afslut_window_response)
             execute_nexus_flow([save_afslut_window])
-            logger.info("Grant removed")
+        logger.info("Grants removed")
         return True
 
     except Exception as e:
