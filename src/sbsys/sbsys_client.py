@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Sbsys Api Client
 class SbsysAPIClient(BaseAPIClient):
-    _client_cache: Dict[Tuple[str, str], 'SbsysAPIClient'] = {}
+    _client_cache: Dict[Tuple[str, str, str, str], 'SbsysAPIClient'] = {}
 
     def __init__(self, client_id, client_secret, username, password):
         super().__init__(SBSYS_URL)
