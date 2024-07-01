@@ -24,8 +24,6 @@ NEXUS_CLIENT_SECRET = os.environ["NEXUS_CLIENT_SECRET"].strip()
 KP_URL = os.environ["KP_URL"].strip()
 KP_USERNAME = os.environ["KP_USERNAME"].strip()
 KP_PASSWORD = os.environ["KP_PASSWORD"].strip()
-KP_SESSION_COOKIE = os.environ["KP_SESSION_COOKIE"].strip()
-KP_CONNECTION_ID = os.environ["KP_CONNECTION_ID"].strip()
 
 # SBSYS
 SBSYS_URL = os.environ["SBSYS_URL"].strip()

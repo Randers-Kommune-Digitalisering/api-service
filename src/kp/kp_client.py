@@ -1,25 +1,9 @@
 import logging
-import time
 import requests
 import json
-import time
 from typing import Dict, Tuple, List, Optional
-from webbot import Browser
-import asyncio
-from pyppeteer import launch
-from pyppeteer.chromium_downloader import download_chromium, chromium_executable
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support.ui import Select
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.firefox import GeckoDriverManager
-from requests.auth import HTTPBasicAuth
 
+from requests.auth import HTTPBasicAuth
 from base_api_client import BaseAPIClient
 from utils.config import KP_URL, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
 
