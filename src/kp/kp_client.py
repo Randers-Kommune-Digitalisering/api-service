@@ -21,7 +21,7 @@ from webdriver_manager.firefox import GeckoDriverManager
 from requests.auth import HTTPBasicAuth
 
 from base_api_client import BaseAPIClient
-from utils.config import KP_URL, KP_SESSION_COOKIE, KP_CONNECTION_ID, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
+from utils.config import KP_URL, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
 
