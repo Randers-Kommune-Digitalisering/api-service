@@ -1,10 +1,9 @@
 import logging
 import time
 import requests
-import json
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple
 from base_api_client import BaseAPIClient
-from utils.config import SBSYS_URL, SBSIP_URL, SBSIP_MASTER_URL
+from utils.config import SBSYS_URL, SBSIP_URL
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +82,10 @@ class SbsysClient:
         return self.api_client.get(path)
 
     def post_request(self, path, data=None, json=None):
-        return self.api_client.post(path, data=data, json=json)
+        return self.api_client.post(path, data, json)
 
     def put_request(self, path, data=None, json=None):
-        return self.api_client.put(path, data=data, json=json)
+        return self.api_client.put(path, data, json)
 
     def delete_request(self, path):
         return self.api_client.delete(path)

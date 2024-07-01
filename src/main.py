@@ -3,13 +3,13 @@ from healthcheck import HealthCheck
 from prometheus_client import generate_latest
 
 from utils.logging import set_logging_configuration, APP_RUNNING
-from utils.config import DEBUG, PORT, POD_NAME, KP_USERNAME, KP_PASSWORD
+from utils.config import DEBUG, PORT, POD_NAME
 from job_endpoints import job_api_bp
 from endpoints.nexus_endpoints import api_nexus_bp
 from endpoints.kp_endpoints import api_kp_bp
 from endpoints.sbsys_endpoints import api_sbsys_bp
-from jobs.nexus_flow_lukning import execute_lukning
-from kp.kp_client import KPClient
+# from jobs.nexus_flow_lukning import execute_lukning
+# from kp.kp_client import KPClient
 
 
 def create_app():
@@ -31,7 +31,5 @@ app = create_app()
 
 if __name__ == "__main__":  # pragma: no cover
     app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
-    # kpclient = KPClient(KP_USERNAME, KP_PASSWORD)
-    # print(kpclient.fetch_token())
     # execute_lukning("111131-1112")
     # fetch_lendings("111131-1112")

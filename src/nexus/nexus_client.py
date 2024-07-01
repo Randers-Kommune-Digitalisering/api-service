@@ -1,7 +1,6 @@
 import logging
 import time
 import requests
-import json
 from typing import Dict, Tuple, List, Optional
 from base_api_client import BaseAPIClient
 from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
@@ -136,7 +135,6 @@ class NexusClient:
             logger.error(f"Unexpected response structure: {e}")
             return None
 
-
     def fetch_borgerkalender(self, patient):
         # Fetch patient preferences
         request1 = NexusRequest(input_response=patient,
@@ -159,16 +157,14 @@ class NexusClient:
                                 method="GET")
         return execute_nexus_flow([request1])
 
-
-
     def get_request(self, path):
         return self.api_client.get(path)
 
     def post_request(self, path, data=None, json=None):
-        return self.api_client.post(path, data=data, json=json)
+        return self.api_client.post(path,data, json)
 
     def put_request(self, path, data=None, json=None):
-        return self.api_client.put(path, data=data, json=json)
+        return self.api_client.put(path, data, json)
 
     def delete_request(self, path):
         return self.api_client.delete(path)

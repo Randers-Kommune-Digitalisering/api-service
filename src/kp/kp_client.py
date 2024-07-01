@@ -1,7 +1,7 @@
 import logging
 import requests
 import json
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple
 
 from requests.auth import HTTPBasicAuth
 from base_api_client import BaseAPIClient

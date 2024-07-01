@@ -53,4 +53,3 @@ def _execute_lukning():
     except Exception as e:
         logger.error(f"Failed to execute lukning: {e}")
         return jsonify({"error": "An error occurred while executing lukning"}), 500
-
