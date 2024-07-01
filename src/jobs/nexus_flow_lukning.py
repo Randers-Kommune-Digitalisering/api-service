@@ -19,11 +19,11 @@ def execute_lukning(cpr: str):
             logger.error("Dashboard not found.")
             return
 
-        #_cancel_events(patient)
-        #_set_conditions_inactive(patient)
+        # _cancel_events(patient)
+        # _set_conditions_inactive(patient)
         # _set_pathways_inactive(dashboard)
         _remove_basket_grants(patient, dashboard)
-        #_remove_patient_grants([2298977])
+        # _remove_patient_grants([2298977])
 
     except Exception as e:
         logger.error(f"Error in job: {e}")
@@ -139,7 +139,6 @@ def _set_pathways_inactive(dashboard):
     try:
         pathway_collection_header_title = ["Alle borgers Handlingsanvisninger", "Skemaer - afslutning af borger"]
         set_pathway_inactive_action_id = [30504, 37102]
-        set_form_inactive_action_id = 30504
         exclude_pathway_names = ["Akutkald"]
 
         # Fetch the pathway collection matching the header title
