@@ -1,3 +1,4 @@
+import re
 import logging
 
 from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID
@@ -11,8 +12,14 @@ delta_client = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_P
 
 def job():
     try:
-        active_org_list = _fetch_all_active_organisations()
+        delta_active_orgs = delta_client.get_adm_org_lists()
+        delta_active_orgs_list = list(delta_active_orgs.keys())
+        for val in delta_active_orgs.values():
+            delta_active_orgs_list.extend(val)
+
+        active_org_list = _fetch_all_active_organisations(delta_active_orgs_list)
         employees_changed_list = delta_client.get_employees_changed()
+
         for index, employee in enumerate(employees_changed_list):
             logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
             execute_brugerauth(active_org_list, employee['user'], employee['organizations'])
@@ -111,13 +118,9 @@ def _update_professional_supplier(professional, supplier, primary_identifier):
     request = NexusRequest(input_response=professional_self, link_href="configuration", method="GET")
     professional_config = execute_nexus_flow([request])
 
-    # Only update supplier if it is None/null
-    if not professional_config.get('defaultOrganizationSupplier'):
-        professional_config['defaultOrganizationSupplier'] = supplier
-        request = NexusRequest(input_response=professional_config, link_href='update', method='PUT', payload=professional_config)
-        return execute_nexus_flow([request])
-    else:
-        logger.info(f'Professional {primary_identifier} already has a supplier - not updating')
+    professional_config['defaultOrganizationSupplier'] = supplier
+    request = NexusRequest(input_response=professional_config, link_href='update', method='PUT', payload=professional_config)
+    return execute_nexus_flow([request])
 
 
 def _fetch_professional_org_syncIds(professional):
@@ -138,20 +141,33 @@ def _fetch_professional_org_syncIds(professional):
     return _collect_syncIds_from_list_or_org(professional_org_list)
 
 
-def _fetch_all_active_organisations():
+def _fetch_all_active_organisations(delta_orgs: list):
     # Home resource
     home_resource = nexus_client.home_resource()
 
     # Active organisations
     request1 = NexusRequest(input_response=home_resource, link_href="activeOrganizationsTree", method="GET")
-    # Suppliers
-    request2 = NexusRequest(input_response=home_resource, link_href="suppliers", method="GET")
 
     all_active_organisations = execute_nexus_flow([request1])
-    all_suppliers = execute_nexus_flow([request2])
-
     organisation_ids = _collect_syncIds_from_list_or_org(all_active_organisations)
-    return _add_supplier_ids(organisation_ids, all_suppliers)
+
+    relevant_organisation_ids = [org for org in organisation_ids if org.get('syncId') in delta_orgs]
+
+    all_suppliers = _get_active_suppliers()
+
+    return _add_supplier_ids(relevant_organisation_ids, all_suppliers)
+
+
+def _get_active_suppliers():
+    home_resource = nexus_client.home_resource()
+
+    request = NexusRequest(input_response=home_resource, link_href="suppliers", method="GET")
+
+    all_suppliers = execute_nexus_flow([request])
+
+    acvite_suppliers = [supplier for supplier in all_suppliers if supplier.get('active')]
+
+    return acvite_suppliers
 
 
 def _collect_syncIds_from_list_or_org(org_input):
@@ -177,7 +193,7 @@ def _collect_syncIds_and_ids_from_org(org: object):
     sync_ids_and_ids = []
     if isinstance(org, dict):
         if 'syncId' in org and org['syncId'] is not None:
-            sync_ids_and_ids.append({'id': org['id'], 'sync_id': org['syncId']})
+            sync_ids_and_ids.append({'id': org['id'], 'syncId': org['syncId'], 'name': org['name']})
         for child in org.get('children', []):
             sync_ids_and_ids.extend(_collect_syncIds_and_ids_from_org(child))
     else:
@@ -187,6 +203,39 @@ def _collect_syncIds_and_ids_from_org(org: object):
 
 def _add_supplier_ids(organisation_ids: list, suppliers: list):
     for org in organisation_ids:
+        # Find supplier with organizationId equal to org id
         supplier = next((item for item in suppliers if item.get('organizationId') == org['id']), None)
-        org['supplier'] = supplier
+        if supplier:
+            org['supplier'] = supplier
+        else:
+            # Special cases
+            # Districts - supplier containing 'dag' and 'distrikt' and org name without 'distrikt' in name
+            supplier_list = [item for item in suppliers if all(s in ' '.join(re.sub("[-/_]", " ", item.get('name').lower()).split()) for s in ['dag', 'distrikt', re.sub("[-/_]", " ", org.get('name').lower().replace('distrikt', ''))])]
+
+            if len(supplier_list) == 1:
+                supplier = supplier_list[0]
+                org['supplier'] = supplier
+            else:
+                # Find supplier with name equal to org name
+                supplier = next((item for item in suppliers if item.get('name') == org['name']), None)
+                if supplier:
+                    org['supplier'] = supplier
+                else:
+                    # Special case for Borgerteam
+                    if org.get('syncId') == "455c1030-8ad4-4da9-98d0-656ce864f2fb":
+                        supplier = next((item for item in suppliers if item.get('id') == 419), None)
+                        if not supplier:
+                            logger.warn(f"Supplier not found for organisation {org['name']}")
+                        org['supplier'] = supplier
+                    # Special case for Plejecentret Solbakken
+                    elif org.get('syncId') == "7a0887f8-e713-4877-8d19-c06a9698f574":
+                        supplier = next((item for item in suppliers if item.get('id') == 77), None)
+                        if not supplier:
+                            logger.warn(f"Supplier not found for organisation {org['name']}")
+                        org['supplier'] = supplier
+                    # Set supplier to None if not found
+                    else:
+                        # TODO: add more special cases
+                        org['supplier'] = None
+
     return organisation_ids
