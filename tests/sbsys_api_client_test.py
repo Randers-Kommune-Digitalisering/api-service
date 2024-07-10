@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import patch
-import requests_mock
 from sbsys.sbsys_client import SbsysAPIClient
 
 sbsys_url = "https://sbsys-mock.com"

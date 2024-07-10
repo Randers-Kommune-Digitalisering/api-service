@@ -3,7 +3,7 @@ import time
 import requests
 from typing import Dict, Tuple
 from base_api_client import BaseAPIClient
-from utils.config import SBSYS_URL, SBSIP_URL
+from utils.config import SBSIP_URL
 
 logger = logging.getLogger(__name__)
 

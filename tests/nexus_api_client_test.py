@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import patch
-import requests_mock
 from nexus.nexus_client import NexusAPIClient
 
 nexus_url = "https://nexus-mock.com"
