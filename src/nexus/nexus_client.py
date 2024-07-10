@@ -33,7 +33,8 @@ class APIClient:
 
     def request_access_token(self):
         # Request a new access token using client credentials
-        nexus_url = f"{self.nexus_url}/authx/realms/randers/protocol/openid-connect/token"
+        nexus_url = f"{self.nexus_url}/authx/realms/randers/protocol/openid-connect/token"  # Review
+        # nexus_url = f"{self.nexus_url}/auth_v2/realms/randers/protocol/openid-connect/token"  # Prod
         payload = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,

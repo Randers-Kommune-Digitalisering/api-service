@@ -233,9 +233,27 @@ def _add_supplier_ids(organisation_ids: list, suppliers: list):
                         if not supplier:
                             logger.warn(f"Supplier not found for organisation {org['name']}")
                         org['supplier'] = supplier
-                    # Set supplier to None if not found
+                    # Special case for Distrikt Kollektivhuset
+                    elif org.get('syncId') == "bdcc0024-0bae-4017-854b-37d36328c50e":
+                        supplier = next((item for item in suppliers if item.get('id') == 431), None)
+                        if not supplier:
+                            logger.warn(f"Supplier not found for organisation {org['name']}")
+                        org['supplier'] = supplier
+                    # Special case for Hospice Randers
+                    elif org.get('syncId') == "608350bc-e60e-44ab-81b1-22e8757ccefb":
+                        supplier = next((item for item in suppliers if item.get('id') == 69), None)
+                        if not supplier:
+                            logger.warn(f"Supplier not found for organisation {org['name']}")
+                        org['supplier'] = supplier
                     else:
-                        # TODO: add more special cases
-                        org['supplier'] = None
+                        # Find supplier with name containing org name - eg. org: Træningshøjskole supplier: Træningshøjskolen
+                        supplier = next((item for item in suppliers if org['name'] in item.get('name')), None)
+                        if supplier:
+                            org['supplier'] = supplier
+                        else:
+                            # Find supplier where org name contains supplier name - eg. org: Plejecenter Aldershvile supplier: Aldershvile
+                            # Or set supplier to None and don't set supplier for users in that org.
+                            supplier = next((item for item in suppliers if item.get('name') in org['name']), None)
+                            org['supplier'] = supplier
 
     return organisation_ids
