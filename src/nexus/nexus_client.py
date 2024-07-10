@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class NexusAPIClient(BaseAPIClient):
     _client_cache: Dict[Tuple[str, str], 'NexusAPIClient'] = {}
 
-    def __init__(self, client_id, client_secret):
-        super().__init__(NEXUS_URL)
+    def __init__(self, client_id, client_secret, url):
+        super().__init__(url)
         self.client_id = client_id
         self.client_secret = client_secret
         self.access_token = None
@@ -22,11 +22,11 @@ class NexusAPIClient(BaseAPIClient):
         self.refresh_token_expiry = None
 
     @classmethod
-    def get_client(cls, client_id, client_secret):
+    def get_client(cls, client_id, client_secret, url):
         key = (client_id, client_secret)
         if key in cls._client_cache:
             return cls._client_cache[key]
-        client = cls(client_id, client_secret)
+        client = cls(client_id, client_secret, url)
         cls._client_cache[key] = client
         return client
 
@@ -95,8 +95,8 @@ class NexusAPIClient(BaseAPIClient):
 
 # Nexus client
 class NexusClient:
-    def __init__(self, client_id, client_secret):
-        self.api_client = NexusAPIClient.get_client(client_id, client_secret)
+    def __init__(self, client_id, client_secret, url):
+        self.api_client = NexusAPIClient.get_client(client_id, client_secret, url)
 
     def home_resource(self):
         path = "api/core/mobile/randers/v2/"
@@ -171,7 +171,7 @@ class NexusClient:
 
 
 # Create an instance of NEXUSClient
-nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
+nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL)
 
 
 class NexusRequest:

@@ -1,7 +1,6 @@
 import pytest
 from main import create_app
 
-
 @pytest.fixture()
 def app():
     app = create_app()
@@ -10,7 +9,6 @@ def app():
     })
 
     yield app
-
 
 @pytest.fixture()
 def client(app):

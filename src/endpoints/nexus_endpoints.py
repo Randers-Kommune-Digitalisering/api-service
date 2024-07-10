@@ -3,11 +3,11 @@ import logging
 # from nexus.nexus_request import NexusRequest, execute_nexus_flow
 from nexus.nexus_client import NexusClient
 from flask import Blueprint, request, jsonify
-from utils.config import NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
+from utils.config import NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL
 from jobs.nexus_flow_lukning import execute_lukning
 
 logger = logging.getLogger(__name__)
-nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
+nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL)
 
 api_nexus_bp = Blueprint('api_nexus', __name__, url_prefix='/api/nexus')
 

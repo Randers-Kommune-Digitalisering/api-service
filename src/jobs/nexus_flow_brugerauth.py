@@ -1,11 +1,11 @@
 import logging
 
-from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
+from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL
 from delta import DeltaClient
 from nexus.nexus_client import NexusClient, NexusRequest, execute_nexus_flow
 
 logger = logging.getLogger(__name__)
-nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
+nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL)
 delta_client = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_PASS, base_url=DELTA_BASE_URL, top_adm_org_uuid=DELTA_TOP_ADM_UNIT_UUID)
 
 

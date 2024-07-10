@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class SbsysAPIClient(BaseAPIClient):
     _client_cache: Dict[Tuple[str, str, str, str], 'SbsysAPIClient'] = {}
 
-    def __init__(self, client_id, client_secret, username, password):
-        super().__init__(SBSYS_URL)
+    def __init__(self, client_id, client_secret, username, password, url):
+        super().__init__(url)
         self.client_id = client_id
         self.client_secret = client_secret
         self.username = username
@@ -24,11 +24,11 @@ class SbsysAPIClient(BaseAPIClient):
         self.refresh_token_expiry = None
 
     @classmethod
-    def get_client(cls, client_id, client_secret, username, password):
+    def get_client(cls, client_id, client_secret, username, password, url):
         key = (client_id, client_secret, username, password)
         if key in cls._client_cache:
             return cls._client_cache[key]
-        client = cls(client_id, client_secret, username, password)
+        client = cls(client_id, client_secret, username, password, url)
         cls._client_cache[key] = client
         return client
 
@@ -45,6 +45,8 @@ class SbsysAPIClient(BaseAPIClient):
             "Content-Type": "application/x-www-form-urlencoded"
         }
         try:
+            if not token_url.startswith("https://"):
+                token_url = "https://" + token_url
             response = requests.post(token_url, headers=headers, data=payload)
             response.raise_for_status()
             data = response.json()
@@ -71,8 +73,8 @@ class SbsysAPIClient(BaseAPIClient):
 
 
 class SbsysClient:
-    def __init__(self, client_id, client_secret, username, password):
-        self.api_client = SbsysAPIClient.get_client(client_id, client_secret, username, password)
+    def __init__(self, client_id, client_secret, username, password, url):
+        self.api_client = SbsysAPIClient.get_client(client_id, client_secret, username, password, url)
 
     def sag_search(self):
         path = "api/sag/search"
