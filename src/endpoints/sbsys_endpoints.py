@@ -22,5 +22,18 @@ def change_sag_status():
 
     if not status_id:
         return jsonify({"error": "SagsStatusID is required"}), 400
-
     # TODO journaliser kladder, og udfør erindringer for sager der skal afluttes, lukkes etc.
+
+
+@api_sbsys_bp.route('/sag/search', methods=['POST'])
+def sag_search():
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"error": "data is required"}), 400
+
+        response = sbsys_client.sag_search(payload=data)
+        return response, 200
+    except Exception as e:
+        return e, 500

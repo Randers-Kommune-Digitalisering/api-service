@@ -35,7 +35,7 @@ class SbsysAPIClient(BaseAPIClient):
     def request_access_token(self):
         token_url = f"{SBSIP_URL}/auth/realms/sbsip/protocol/openid-connect/token"
         payload = {
-            "grant_type": "client_credentials",
+            "grant_type": "password",
             "client_id": self.client_id,
             "client_secret": self.client_secret,
             "username": self.username,
@@ -76,9 +76,9 @@ class SbsysClient:
     def __init__(self, client_id, client_secret, username, password, url):
         self.api_client = SbsysAPIClient.get_client(client_id, client_secret, username, password, url)
 
-    def sag_search(self):
+    def sag_search(self, payload):
         path = "api/sag/search"
-        return self.get_request(path)
+        return self.api_client.post(path=path, json=payload)
 
     def get_request(self, path):
         return self.api_client.get(path)
