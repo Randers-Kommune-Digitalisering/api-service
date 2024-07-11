@@ -20,9 +20,15 @@ def job():
         active_org_list = _fetch_all_active_organisations(delta_active_orgs_list)
         employees_changed_list = delta_client.get_employees_changed()
 
-        for index, employee in enumerate(employees_changed_list):
-            logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
-            execute_brugerauth(active_org_list, employee['user'], employee['organizations'])
+        if employees_changed_list:
+            logger.info("Employees changed - updating Nexus from external system")
+            _sync_orgs_and_users()
+
+            for index, employee in enumerate(employees_changed_list):
+                logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
+                execute_brugerauth(active_org_list, employee['user'], employee['organizations'])
+        else:
+            logger.info("No employees changed")
         return True
     except Exception as e:
         logger.error(f"Error in job: {e}")
@@ -203,47 +209,50 @@ def _collect_syncIds_and_ids_from_org(org: object):
 
 def _add_supplier_ids(organisation_ids: list, suppliers: list):
     for org in organisation_ids:
-        # Find supplier with organizationId equal to org id
-        supplier = next((item for item in suppliers if item.get('organizationId') == org['id']), None)
-        if supplier:
+        # Special cases
+        # Special case for Det Danske Madhus
+        if org.get('syncId') == "91eb882f-8a4c-43f1-9417-7b6207f6d806":
+            org['supplier'] = None
+        # Special case for Borgerteam
+        elif org.get('syncId') == "455c1030-8ad4-4da9-98d0-656ce864f2fb":
+            supplier = next((item for item in suppliers if item.get('id') == 419), None)
+            if not supplier:
+                logger.warn(f"Supplier not found for organisation {org['name']}")
+            org['supplier'] = supplier
+        # Special case for Plejecentret Solbakken
+        elif org.get('syncId') == "7a0887f8-e713-4877-8d19-c06a9698f574":
+            supplier = next((item for item in suppliers if item.get('id') == 77), None)
+            if not supplier:
+                logger.warn(f"Supplier not found for organisation {org['name']}")
+            org['supplier'] = supplier
+        # Special case for Distrikt Kollektivhuset
+        elif org.get('syncId') == "bdcc0024-0bae-4017-854b-37d36328c50e":
+            supplier = next((item for item in suppliers if item.get('id') == 431), None)
+            if not supplier:
+                logger.warn(f"Supplier not found for organisation {org['name']}")
+            org['supplier'] = supplier
+        # Special case for Hospice Randers
+        elif org.get('syncId') == "608350bc-e60e-44ab-81b1-22e8757ccefb":
+            supplier = next((item for item in suppliers if item.get('id') == 69), None)
+            if not supplier:
+                logger.warn(f"Supplier not found for organisation {org['name']}")
             org['supplier'] = supplier
         else:
-            # Special cases
-            # Districts - supplier containing 'dag' and 'distrikt' and org name without 'distrikt' in name
-            supplier_list = [item for item in suppliers if all(s in ' '.join(re.sub("[-/_]", " ", item.get('name').lower()).split()) for s in ['dag', 'distrikt', re.sub("[-/_]", " ", org.get('name').lower().replace('distrikt', ''))])]
-
-            if len(supplier_list) == 1:
-                supplier = supplier_list[0]
+            # Find supplier with organizationId equal to org id
+            supplier = next((item for item in suppliers if item.get('organizationId') == org['id']), None)
+            if supplier:
                 org['supplier'] = supplier
             else:
-                # Find supplier with name equal to org name
-                supplier = next((item for item in suppliers if item.get('name') == org['name']), None)
-                if supplier:
+                # Districts - supplier containing 'dag' and 'distrikt' and org name without 'distrikt' in name
+                supplier_list = [item for item in suppliers if all(s in ' '.join(re.sub("[-/_]", " ", item.get('name').lower()).split()) for s in ['dag', 'distrikt', re.sub("[-/_]", " ", org.get('name').lower().replace('distrikt', ''))])]
+
+                if len(supplier_list) == 1:
+                    supplier = supplier_list[0]
                     org['supplier'] = supplier
                 else:
-                    # Special case for Borgerteam
-                    if org.get('syncId') == "455c1030-8ad4-4da9-98d0-656ce864f2fb":
-                        supplier = next((item for item in suppliers if item.get('id') == 419), None)
-                        if not supplier:
-                            logger.warn(f"Supplier not found for organisation {org['name']}")
-                        org['supplier'] = supplier
-                    # Special case for Plejecentret Solbakken
-                    elif org.get('syncId') == "7a0887f8-e713-4877-8d19-c06a9698f574":
-                        supplier = next((item for item in suppliers if item.get('id') == 77), None)
-                        if not supplier:
-                            logger.warn(f"Supplier not found for organisation {org['name']}")
-                        org['supplier'] = supplier
-                    # Special case for Distrikt Kollektivhuset
-                    elif org.get('syncId') == "bdcc0024-0bae-4017-854b-37d36328c50e":
-                        supplier = next((item for item in suppliers if item.get('id') == 431), None)
-                        if not supplier:
-                            logger.warn(f"Supplier not found for organisation {org['name']}")
-                        org['supplier'] = supplier
-                    # Special case for Hospice Randers
-                    elif org.get('syncId') == "608350bc-e60e-44ab-81b1-22e8757ccefb":
-                        supplier = next((item for item in suppliers if item.get('id') == 69), None)
-                        if not supplier:
-                            logger.warn(f"Supplier not found for organisation {org['name']}")
+                    # Find supplier with name equal to org name
+                    supplier = next((item for item in suppliers if item.get('name') == org['name']), None)
+                    if supplier:
                         org['supplier'] = supplier
                     else:
                         # Find supplier with name containing org name - eg. org: Træningshøjskole supplier: Træningshøjskolen
@@ -257,3 +266,10 @@ def _add_supplier_ids(organisation_ids: list, suppliers: list):
                             org['supplier'] = supplier
 
     return organisation_ids
+
+
+def _sync_orgs_and_users():
+    home_resource = nexus_client.home_resource()
+    request1 = NexusRequest(input_response=home_resource, link_href="synchronizeStsOrganizations", method="POST")
+
+    return execute_nexus_flow([request1])
