@@ -182,10 +182,6 @@ class NexusClient:
         except Exception as e:
             logger.error(f"Error in fetching dashboard: {e}")
 
-    def find_patient_by_query(self, query):
-        path = "api/core/mobile/randers/v2/patients/?query=" + query
-        return self.api_client.get(path)
-
     def get_request(self, path):
         return self.api_client.get(path)
 

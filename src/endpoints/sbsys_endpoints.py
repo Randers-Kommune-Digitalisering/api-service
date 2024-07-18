@@ -39,6 +39,7 @@ def sag_search():
     except Exception as e:
         return e, 500
 
+
 # Returns a files based on Documents name property
 # Documents can have multiple files
 # Documents are filtered by the name property
@@ -77,4 +78,3 @@ def fil_by_keyword():
         return jsonify(files), 200
     except Exception as e:
         return jsonify({"error": f"{e}"}), 500
-

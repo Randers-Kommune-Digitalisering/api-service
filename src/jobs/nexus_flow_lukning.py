@@ -25,7 +25,6 @@ def execute_lukning(cpr: str):
         _set_pathways_inactive(patient)
         # _remove_patient_grants([2298969])
 
-
     except Exception as e:
         logger.error(f"Error in job: {e}")
 
