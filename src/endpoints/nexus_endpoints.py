@@ -17,7 +17,7 @@ def fetch_lendings_endpoint():
     data = request.get_json()
     cpr = data.get('cpr')
     if not cpr:
-        return jsonify({"error": "CPR is required"}), 400
+        return jsonify({"error": "cpr is required"}), 400
 
     lendings = _fetch_lendings(cpr)
     return jsonify(lendings), 200

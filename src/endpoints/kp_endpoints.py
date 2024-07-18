@@ -17,11 +17,16 @@ def fetch_kp_token():
 
 @api_kp_bp.route('/search/person', methods=['POST'])
 def search_person():
-    data = request.get_json()
-    cpr = data.get('cpr')
-    if not cpr:
-        return jsonify({"error": "CPR is required"}), 400
-    response = kp_client.search_person(cpr)
-    if response is None:
-        return jsonify({"error": "No response"}), 400
-    return jsonify(response)
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "cpr is required"}), 400
+        cpr = data.get('cpr')
+        if not cpr:
+            return jsonify({"error": "cpr is required"}), 400
+        response = kp_client.search_person(cpr)
+        if response is None:
+            return jsonify({"error": "No response"}), 400
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": f"{e}"}), 500

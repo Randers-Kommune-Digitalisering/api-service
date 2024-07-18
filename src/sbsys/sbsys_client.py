@@ -80,6 +80,14 @@ class SbsysClient:
         path = "api/sag/search"
         return self.api_client.post(path=path, json=payload)
 
+    def fetch_documents(self, sag_id):
+        path = f"api/sag/{sag_id}/dokumenter"
+        return self.api_client.get(path=path)
+
+    def fetch_file(self, file_id):
+        path = f"/api/fil/{file_id}"
+        return self.api_client.get(path=path)
+
     def get_request(self, path):
         return self.api_client.get(path)
 

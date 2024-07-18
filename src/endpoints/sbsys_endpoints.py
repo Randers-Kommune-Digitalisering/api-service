@@ -1,4 +1,5 @@
 import logging
+import base64
 from sbsys.sbsys_client import SbsysClient
 from flask import Blueprint, request, jsonify
 from utils.config import (SBSYS_USERNAME, SBSYS_PASSWORD, SBSIP_CLIENT_ID, SBSIP_CLIENT_SECRET,
@@ -37,3 +38,43 @@ def sag_search():
         return response, 200
     except Exception as e:
         return e, 500
+
+# Returns a files based on Documents name property
+# Documents can have multiple files
+# Documents are filtered by the name property
+@api_sbsys_bp.route('/fil/keywords', methods=['POST'])
+def fil_by_keyword():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "'keywords' and 'sagID' properties are required. 'keywords' is an array of strings. 'sagID' is a integer"}), 400
+        if not data['keywords'] or not data['sagID']:
+            return jsonify({"error": "'keywords' and 'sagID' properties are required. 'keywords' is an array of strings. 'sagID' is a integer"}), 400
+        if not isinstance(data['keywords'], list):
+            return jsonify({"error": "keywords has to be a list"})
+        documents_response = sbsys_client.fetch_documents(data['sagID'])
+        if not documents_response:
+            return jsonify({"error": f"No documents were found with sag id: {data['sagID']}"}), 404
+
+        files = []
+        for keyword in data['keywords']:
+            keyword = keyword.lower()
+            filtered_documents = [doc for doc in documents_response if 'Navn' in doc and keyword in doc['Navn'].lower()]
+            for document in filtered_documents:
+                for fil in document['Filer']:
+                    fil_response = sbsys_client.fetch_file(fil['ShortId'])
+                    if not fil_response:
+                        continue
+                    # Convert bytes to base64 string
+                    encoded_file = base64.b64encode(fil_response).decode('utf-8')
+                    files.append({
+                        'filename': fil['Filnavn'],
+                        'document_name': document['Navn'],
+                        'data': encoded_file,
+                        'mime_type': fil['MimeType']
+                    })
+
+        return jsonify(files), 200
+    except Exception as e:
+        return jsonify({"error": f"{e}"}), 500
+
