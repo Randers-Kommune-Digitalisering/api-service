@@ -157,6 +157,31 @@ class NexusClient:
                                 method="GET")
         return execute_nexus_flow([request1])
 
+    def fetch_dashboard(self, patient, dasboard_id):
+        try:
+            # patient preferences
+            request1 = NexusRequest(input_response=patient,
+                                    link_href="patientPreferences",
+                                    method="GET")
+            patient_preferences = execute_nexus_flow([request1])
+
+            # Reference to Citizen dashboard
+            citizen_dashboard = next((item for item in patient_preferences["CITIZEN_DASHBOARD"] if
+                                      item['id'] == dasboard_id), None)
+
+            if citizen_dashboard is None:
+                logger.error(f"Citizen dashboard with id {dasboard_id} not found.")
+                return False
+
+            # Self object for Citizen dashboard for "Afslutning af borger"
+            request1 = NexusRequest(input_response=citizen_dashboard,
+                                    link_href="self",
+                                    method="GET")
+            return execute_nexus_flow([request1])
+
+        except Exception as e:
+            logger.error(f"Error in fetching dashboard: {e}")
+
     def get_request(self, path):
         return self.api_client.get(path)
 
