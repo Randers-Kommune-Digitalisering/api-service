@@ -1,39 +1,37 @@
 import logging
 import time
 import requests
-import json
-from typing import List, Optional
-
+from typing import Dict, Tuple, List, Optional
+from base_api_client import BaseAPIClient
 from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
-
 
 logger = logging.getLogger(__name__)
 
 
-# Håndtering af http request
-class APIClient:
-    _instance = None
+# Nexus api client
+class NexusAPIClient(BaseAPIClient):
+    _client_cache: Dict[Tuple[str, str], 'NexusAPIClient'] = {}
 
-    def __new__(cls, nexus_url, client_id, client_secret):
-        if cls._instance is None:
-            cls._instance = super(APIClient, cls).__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
+    def __init__(self, client_id, client_secret, url):
+        super().__init__(url)
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.access_token = None
+        self.access_token_expiry = None
+        self.refresh_token = None
+        self.refresh_token_expiry = None
 
-    def __init__(self, nexus_url, client_id, client_secret):
-        if not self._initialized:  # Check if already initialized
-            self.nexus_url = nexus_url
-            self.client_id = client_id
-            self.client_secret = client_secret
-            self.access_token = None
-            self.access_token_expiry = None
-            self.refresh_token = None
-            self.refresh_token_expiry = None
-            self._initialized = True
+    @classmethod
+    def get_client(cls, client_id, client_secret, url):
+        key = (client_id, client_secret)
+        if key in cls._client_cache:
+            return cls._client_cache[key]
+        client = cls(client_id, client_secret, url)
+        cls._client_cache[key] = client
+        return client
 
     def request_access_token(self):
-        # Request a new access token using client credentials
-        nexus_url = f"{self.nexus_url}/authx/realms/randers/protocol/openid-connect/token"
+        token_url = f"{self.base_url}/authx/realms/randers/protocol/openid-connect/token"
         payload = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,
@@ -43,7 +41,7 @@ class APIClient:
             "Content-Type": "application/x-www-form-urlencoded"
         }
         try:
-            response = requests.post(nexus_url, headers=headers, data=payload)
+            response = requests.post(token_url, headers=headers, data=payload)
             response.raise_for_status()
             data = response.json()
             self.access_token = data['access_token']
@@ -56,9 +54,7 @@ class APIClient:
             return None
 
     def refresh_access_token(self):
-        # Refresh the access token using the refresh token
-
-        nexus_url = f"{self.nexus_url}/authx/realms/randers/protocol/openid-connect/token"
+        token_url = f"{self.base_url}/authx/realms/randers/protocol/openid-connect/token"
         payload = {
             "grant_type": "refresh_token",
             "client_id": self.client_id,
@@ -69,7 +65,7 @@ class APIClient:
             "Content-Type": "application/x-www-form-urlencoded"
         }
         try:
-            response = requests.post(nexus_url, headers=headers, data=payload)
+            response = requests.post(token_url, headers=headers, data=payload)
             response.raise_for_status()
             data = response.json()
             self.access_token = data['access_token']
@@ -82,85 +78,62 @@ class APIClient:
             return None
 
     def authenticate(self):
-        # If access token is valid, return it
         if self.access_token and self.access_token_expiry and time.time() < self.access_token_expiry:
             return self.access_token
-        # If refresh token is valid, try to refresh the access token
         elif self.refresh_token and self.refresh_token_expiry and time.time() < self.refresh_token_expiry:
             return self.refresh_access_token()
-        # Otherwise, request a new access token using client credentials
         else:
             return self.request_access_token()
 
     def get_access_token(self):
-        # Get a valid access token, refreshing or re-authenticating if necessary
         return self.authenticate()
 
-    def _make_request(self, method, path, **kwargs):
+    def get_auth_headers(self):
         token = self.get_access_token()
-        # Check if the path is a full URL
-        if path.startswith("http://") or path.startswith("https://"):
-            url = path
-        else:
-            url = f"{self.nexus_url}/{path}"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-
-        try:
-            response = method(url, headers=headers, **kwargs)
-            response.raise_for_status()
-
-            try:
-                return response.json()
-            except json.JSONDecodeError:
-                # If the response is empty, return 'success'
-                if not response.content:
-                    return 'success'
-                # If the response is not JSON, return the response content directly
-                return response.content
-
-        except requests.exceptions.RequestException as e:
-            logger.error(e)
-            if response.content:
-                logger.error(response.content)
-            return None
-
-    def get(self, path):
-        return self._make_request(requests.get, path)
-
-    def post(self, path, data=None, json=None):
-        return self._make_request(requests.post, path, data=data, json=json)
-
-    def put(self, path, data=None, json=None):
-        return self._make_request(requests.put, path, data=data, json=json)
-
-    def delete(self, path):
-        return self._make_request(requests.delete, path)
+        return {"Authorization": f"Bearer {token}"}
 
 
 # Nexus client
-class NEXUSClient:
-    def __init__(self):
-        self.api_client = APIClient(NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET)
+class NexusClient:
+    def __init__(self, client_id, client_secret, url):
+        self.api_client = NexusAPIClient.get_client(client_id, client_secret, url)
 
     def home_resource(self):
         path = "api/core/mobile/randers/v2/"
-        return self.api_client.get(path)
+        return self.get_request(path)
 
     def find_professional_by_query(self, query):
         path = "api/core/mobile/randers/v2/professionals/?query=" + query
+        return self.get_request(path)
+
+    def find_patient_by_query(self, query):
+        path = "api/core/mobile/randers/v2/patients/?query=" + query
         return self.api_client.get(path)
 
     def fetch_patient_by_query(self, query):
-        patient_search = self.find_patient_by_query(query=query)
-        patient_link = patient_search['pages'][0]['_links']['patientData']['href']
+        try:
+            patient_search = self.find_patient_by_query(query=query)
+            if not patient_search['pages']:
+                logger.info(f"No patients found for query: {query}")
+                return None
 
-        patient_response = self.get_request(path=patient_link)
-        self_path = patient_response[0]['_links']['self']['href']
-        patient_self_response = self.get_request(self_path)
-        return patient_self_response
+            patient_link = patient_search['pages'][0]['_links']['patientData']['href']
+            patient_response = self.get_request(path=patient_link)
+
+            if not patient_response:
+                logger.info(f"No patient data found at link: {patient_link}")
+                return None
+
+            self_path = patient_response[0]['_links']['self']['href']
+            patient_self_response = self.get_request(self_path)
+
+            return patient_self_response
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed: {e}")
+            return None
+        except KeyError as e:
+            logger.error(f"Unexpected response structure: {e}")
+            return None
 
     def fetch_borgerkalender(self, patient):
         # Fetch patient preferences
@@ -217,17 +190,17 @@ class NEXUSClient:
         return self.api_client.get(path)
 
     def post_request(self, path, data=None, json=None):
-        return self.api_client.post(path, data=data, json=json)
+        return self.api_client.post(path, data, json)
 
     def put_request(self, path, data=None, json=None):
-        return self.api_client.put(path, data=data, json=json)
+        return self.api_client.put(path, data, json)
 
     def delete_request(self, path):
         return self.api_client.delete(path)
 
 
 # Create an instance of NEXUSClient
-nexus_client = NEXUSClient()
+nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL)
 
 
 class NexusRequest:
