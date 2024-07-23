@@ -4,3 +4,5 @@ prometheus-client==0.20.0
 python-dotenv==1.0.1
 requests==2.31.0 # requests-pkcs12 breaks with requests 2.32.*
 requests-pkcs12
+xmltodict
+python-dateutil
