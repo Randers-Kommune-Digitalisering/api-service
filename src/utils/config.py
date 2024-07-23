@@ -45,3 +45,8 @@ SBSYS_PASSWORD = os.environ["SBSYS_PASSWORD"].strip()
 # Browserless
 BROWSERLESS_CLIENT_ID = os.environ["BROWSERLESS_CLIENT_ID"].strip()
 BROWSERLESS_CLIENT_SECRET = os.environ["BROWSERLESS_CLIENT_SECRET"].strip()
+
+# SD
+SD_USERNAME = os.environ["SD_USERNAME"].strip()
+SD_PASSWORD = os.environ["SD_PASSWORD"].strip()
+SD_URL = os.environ["SD_URL"].strip()
