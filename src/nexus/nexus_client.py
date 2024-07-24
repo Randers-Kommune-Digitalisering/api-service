@@ -88,7 +88,7 @@ class NexusAPIClient(BaseAPIClient):
     def get_access_token(self):
         return self.authenticate()
 
-    def get_auth_headers(self):
+    def get_headers(self):
         token = self.get_access_token()
         return {"Authorization": f"Bearer {token}"}
 

@@ -66,7 +66,7 @@ class SbsysAPIClient(BaseAPIClient):
     def get_access_token(self):
         return self.authenticate()
 
-    def get_auth_headers(self):
+    def get_headers(self):
         token = self.get_access_token()
         return {"Content-Type": "application/json",
                 "Authorization": f"Bearer {token}"}

@@ -128,7 +128,7 @@ class KPAPIClient(BaseAPIClient):
             return self.session_cookie
         return self.request_session_token()
 
-    def get_auth_headers(self):
+    def get_headers(self):
         session_cookie = self.authenticate()
         headers = {"Cookie": f"JSESSIONID={session_cookie}"}
         print(headers)
@@ -143,7 +143,7 @@ class KPAPIClient(BaseAPIClient):
             if e.response.status_code == 401 and self.auth_attempted is False:
                 logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
                 self.authenticate()  # Attempt to fetch new session token
-                headers = self.get_auth_headers()  # Update headers with new session token
+                headers = self.get_headers()  # Update headers with new session token
                 self.auth_attempted = True
                 return method(path, headers=headers, **kwargs)  # Retry the request
             elif e.response.status_code == 401 and self.auth_attempted is True:

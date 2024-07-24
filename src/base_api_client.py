@@ -12,11 +12,11 @@ class BaseAPIClient(ABC):
         self.base_url = base_url
 
     @abstractmethod
-    def get_auth_headers(self):
+    def get_headers(self):
         pass
 
     def _make_request(self, method, path, **kwargs):
-        headers = self.get_auth_headers()
+        headers = self.get_headers()
         if path.startswith("http://") or path.startswith("https://"):
             url = path
         else:

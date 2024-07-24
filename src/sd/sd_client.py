@@ -33,7 +33,7 @@ class SDAPIClient(BaseAPIClient):
     def authenticate(self):
         return HTTPBasicAuth(self.username, self.password)
 
-    def get_auth_headers(self):
+    def get_headers(self):
         return {"Content-Type": "application/xml"}
 
     def _make_request(self, method, path, **kwargs):
