@@ -60,14 +60,25 @@ class SDAPIClient(BaseAPIClient):
                     logger.info("Received a non-HTML response that cannot be parsed for closure details.")
                 else:
                     title = soup.title.string if soup.title else 'No title'
-                    message = soup.find(id='js_txt').text if soup.find(
-                        id='js_txt') else 'No specific message found.'
+                    message = soup.find(id='js_txt').text if soup.find(id='js_txt') else 'No specific message found.'
                     logger.info(f"API is closed. Title: {title}, Message: {message}")
                     return None
             elif 'application/xml' in content_type or 'text/xml' in content_type:
                 # Handle XML response
                 try:
-                    return xml_to_json(response.content)
+                    response_dict = xml_to_json(response.content)
+                    # Check for SOAP Fault in the response
+                    fault = response_dict.get('Envelope', {}).get('Body', {}).get('Fault', None)
+                    if fault:
+                        fault_code = fault.get('faultcode', 'No fault code')
+                        fault_string = fault.get('faultstring', 'No fault string')
+                        fault_actor = fault.get('faultactor', 'No fault actor')
+                        fault_detail = fault.get('detail', {}).get('string', 'No fault detail')
+                        logger.error(
+                            f"SOAP Fault occurred: Code: {fault_code}, String: {fault_string}, Actor: {fault_actor}, Detail: {fault_detail}")
+                        return None
+
+                    return response_dict
                 except Exception as e:
                     logger.error(f"An error occurred while parsing the XML response: {e}")
                     return None
@@ -91,7 +102,6 @@ class SDClient:
             return response
         except Exception as e:
             logger.error(f"An error occurred while perform get_request: {e}")
-
 
     def post_request(self, path: str, data=None, json=None, params: Optional[Dict[str, str]] = None):
         try:
@@ -119,9 +129,7 @@ def xml_to_json(xml_data):
     try:
         # Parse the XML data into a dictionary
         dict_data = xmltodict.parse(xml_data)
-        # Convert the dictionary to a JSON string
-        json_data = json.dumps(dict_data, indent=4)
-        return json_data
+        return dict_data
     except Exception as e:
         logger.error(f"An error occurred while converting XML to JSON: {e}")
         return None
