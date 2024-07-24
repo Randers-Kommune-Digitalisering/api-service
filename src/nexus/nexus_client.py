@@ -74,7 +74,11 @@ class NexusAPIClient(BaseAPIClient):
             self.refresh_token_expiry = time.time() + data.get('refresh_expires_in', 0)
             return self.access_token
         except requests.exceptions.RequestException as e:
-            logger.error(e)
+            # Log the error message and response content
+            if e.response is not None:
+                logger.error(f"Error: {e}\nResponse content: {e.response.content.decode('utf-8')}")
+            else:
+                logger.error(f"Error: {e}")
             return None
 
     def authenticate(self):
