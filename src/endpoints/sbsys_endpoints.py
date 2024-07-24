@@ -59,11 +59,14 @@ def fil_by_keyword():
                 return jsonify({"error": "allowedFiletypes must be a list of strings. e.g. ['pdf', 'docs']"})
             allowed_filetypes = data['allowedFiletypes']
 
+        # Fetch documents from sag specified by sag id
         documents_response = sbsys_client.fetch_documents(data['sagID'])
         if not documents_response:
             return jsonify({"error": f"No documents were found with sag id: {data['sagID']}"}), 404
 
+
         files = []
+        # Iterate over keywords, and filter by comparing keyword name with document name
         for keyword in data['keywords']:
             keyword = keyword.lower()
             filtered_documents = [doc for doc in documents_response if 'Navn' in doc and keyword in doc['Navn'].lower()]
@@ -73,10 +76,14 @@ def fil_by_keyword():
                     if not file_content:
                         continue
 
+                    # Check if the file has allowed filetypes
                     if allowed_filetypes and not fil['Filendelse'].lower() in allowed_filetypes:
                         continue
 
+                    # Encode binary file code to base64
                     encoded_file = base64.b64encode(file_content).decode('utf-8')
+
+                    #  Create a file object
                     files.append({
                         'filename': fil['Filnavn'],
                         'document_name': document['Navn'],
