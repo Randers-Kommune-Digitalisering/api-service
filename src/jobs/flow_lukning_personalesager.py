@@ -23,6 +23,9 @@ def execute_lukning():
     fetch_personalesag()
 
 def fetch_employments_changed():
+
+    person_list = []
+
     # Fetch changed employments foreach SD institution code
     for inst_code in sd_inst_codes:
         path = 'GetEmploymentChanged20070401'
@@ -41,7 +44,7 @@ def fetch_employments_changed():
 
         # Define the SD params
         params = {
-            f'InstitutionIdentifier': inst_code,
+            'InstitutionIdentifier': inst_code,
             'EmploymentStatusIndicator': 'true',
             'PersonCivilRegistrationIdentifier': '',
             'EmploymentIdentifier': '',
@@ -60,9 +63,11 @@ def fetch_employments_changed():
             response = sd_client.post_request(path=path, params=params)
             if not response:
                 logger.warning("No response from SD client")
-            else:
-                logger.info(f"Employments were found: {response}")
+                return None
             return response
+            current_inst_code_person_list = response['RequestStructure']
+            person_list.append(response)
+
 
         except Exception as e:
             logger.error(e)

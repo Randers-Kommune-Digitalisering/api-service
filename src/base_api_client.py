@@ -29,7 +29,7 @@ class BaseAPIClient(ABC):
             except json.JSONDecodeError:
                 if not response.content:
                     return 'success'
-                return response.content
+                return response
         except requests.exceptions.RequestException as e:
             logger.error(e)
             if response.content:
