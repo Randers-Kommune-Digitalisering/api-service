@@ -6,3 +6,7 @@ requests==2.31.0 # requests-pkcs12 breaks with requests 2.32.*
 requests-pkcs12
 xmltodict
 python-dateutil
+PyPDF2
+pytesseract
+Pillow
+pdf2image
