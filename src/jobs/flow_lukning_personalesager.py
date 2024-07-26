@@ -317,24 +317,25 @@ def extract_cpr_and_institution(person_list):
             if not isinstance(employment_list, list):
                 employment_list = [employment_list]
 
-            # Use a set to store unique InstitutionIdentifiers
-            institutions = set()
+            # Store InstitutionIdentifier in a list
+            institutions = []
             for employment in employment_list:
                 institution = employment.get("InstitutionIdentifier", "")
-                if institution:
-                    institutions.add(institution)
+                if not institution:
+                    continue
 
-            # Convert the set to a list
-            unique_institutions = list(institutions)
+                if institution in institutions:
+                    continue
+
+                institutions.append(institution)
 
             # Append to result
-            result.append((cpr, unique_institutions))
+            result.append((cpr, institutions))
 
     except Exception as e:
         logger.error(f"Error during extract_cpr_and_institution: {e}")
 
     return result
-
 
 def process_employments(employments, inst_code):
     try:
