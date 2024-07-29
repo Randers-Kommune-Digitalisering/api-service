@@ -1,5 +1,4 @@
-from src.jobs.flow_lukning_personalesager import extract_cpr_and_institution
-import pytest
+from jobs.flow_lukning_personalesager import extract_cpr_and_institution
 
 
 class TestExtractCprAndInstitution():
