@@ -5,6 +5,7 @@ import json
 import re
 import PyPDF2
 import io
+import csv
 from pdf2image import convert_from_bytes
 import pytesseract
 
@@ -24,7 +25,7 @@ sbsys_client = SbsysClient(SBSIP_PSAG_CLIENT_ID, SBSIP_PSAG_CLIENT_SECRET,
                            SBSYS_PSAG_USERNAME, SBSYS_PSAG_PASSWORD, SBSYS_URL)
 
 date_patterns = [
-        r"Du er fra den (d{1,2}. [a-zA-Z]+ \d{4}) ansat",
+        r"Du er fra den (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4}) ansat",
         r"Du er fra (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4}) ansat",
         r"du fra den (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4}) er ansat",
         r"Du er fra (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4}) til",
@@ -49,34 +50,45 @@ sd_inst_codes = ["AI", "OV", "RS", "OR",
 active_status_codes = ["0", "1", "3"]
 passive_status_codes = ["7", "8", "9", "S"]
 
+months_ago = 3
+
 def execute_lukning():
-    months_ago = 3
-    #person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
+    # institutions_and_departments = fetch_institutions_and_departments("9R")
+    institutions_and_departments = read_json_file('files/institutions_and_departments.json')
+    # person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
 
     # cpr_list = extract_cpr_and_institution(read_json_file('files/employment_changed.json'))
-    #cpr_list = extract_cpr_and_institution(person_employment_changed_list)
+    # cpr_list = extract_cpr_and_institution(person_employment_changed_list)
 
-    #person_list = fetch_employments(cpr_list)
-    # person_list = read_json_file('files/person_employments.json')
+    # person_employment_list = fetch_employments(cpr_list)
+    # person_employment_list = read_json_file('files/person_employments.json')
 
-    # active_person_list, passive_person_list = filter_persons_by_employment_status(person_list,
-    #                                                                              active_status_codes,
-    #                                                                              passive_status_codes)
+    # active_person_list, passive_person_list = filter_persons_by_employment_status(person_employment_list)
     active_person_list = read_json_file('files/active_persons.json')
+
     passive_person_list = []
     process_personalesager(active_person_list=active_person_list,
                            passive_person_list=passive_person_list,
-                           delforloeb_title="01 Ansættelse")
+                           delforloeb_title="01 Ansættelse",
+                           institutions_and_departments=institutions_and_departments)
 
 
-def process_personalesager(active_person_list: list, passive_person_list: list, delforloeb_title: str):
+def process_personalesager(active_person_list: list, passive_person_list: list, delforloeb_title: str, institutions_and_departments: list):
     for person in passive_person_list:
         break
 
+    statistics = []
+    i = 0
+    active_person_count = len(active_person_list)
     for person in active_person_list:
-        cpr = person.get('PersonCivilRegistrationIdentifier', None)
+        # if i == 5:
+        #     break
 
-        if not cpr:
+
+        cpr = person.get('PersonCivilRegistrationIdentifier', None)
+        employment_list = person.get('Employment', None)
+
+        if not cpr or not employment_list:
             continue
 
         # Reformat cpr to include '-' -required Sbsys cpr formatting
@@ -88,7 +100,8 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
         if not sager:
             continue
 
-        # Go through sager and fetch files
+        employment_match_list = []
+        # Go through sager and compare ansaettelsessted from sag to DepartmentCode from SD employment
         for sag in sager:
             sag_id = sag.get('Id', None)
 
@@ -98,9 +111,26 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
 
             # Fetch the files from given delforloeb in current sag
             allowed_filetypes = [".pdf"]
-            delforloeb_files = fetch_delforloeb_files(sag_id=sag_id, delforloeb_title=delforloeb_title, allowed_filetypes=allowed_filetypes)
+            # delforloeb_files = fetch_delforloeb_files(sag_id=sag_id, delforloeb_title=delforloeb_title, allowed_filetypes=allowed_filetypes)
+
+            sag_employment_location = sag.get('Ansaettelsessted', None).get('Navn', None)
+            if not sag_employment_location:
+                logger.info(f"sag_employment_location is None - No Ansaettelsessted found on sag id: {sag_id}")
+                continue
+
+            department_codes = find_department_codes(institutions_and_departments, sag_employment_location)
+            if not department_codes:
+                logger.info(f"department_codes is None - sag with id: {sag_id} {sag_employment_location} does not correspond with any SD departments")
+                continue
+
+            employment_location_match_list = filter_employment_by_department(employment_list, department_codes['DepartmentCodes'], sag_id, sag_employment_location)
+            write_json(f'files/match_result/{cpr}_employment_location_match_list_{sag_id}.json', employment_location_match_list)
+            employment_match_list.append(employment_location_match_list)
+
+            continue # Skip reading files
 
             # Go through the files found in the given delforloeb
+            delforloeb_files = []
             for delforloeb_file in delforloeb_files:
                 if isinstance(delforloeb_file, list) and len(delforloeb_file) == 1:
                     delforloeb_file = delforloeb_file[0]
@@ -132,7 +162,132 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
                     logger.debug(f"Employment Dates: {employment_dates}")
                     return employment_dates
 
-        return
+        personale_sager_count = len(sager)
+        sager_closed_count = 0
+        employment_count = len(employment_list)
+        total_employment_match_count = len(combine_lists(employment_match_list))
+        active_employment_count = count_parameter_in_nested_list(employment_list, ["EmploymentStatus", "EmploymentStatusCode"], active_status_codes)
+        matched_active_employments_count = count_parameter_in_nested_list(combine_lists(employment_match_list), ["EmploymentStatus", "EmploymentStatusCode"], active_status_codes)
+        statistics.append(compile_statistics(cpr, personale_sager_count, sager_closed_count, employment_count, total_employment_match_count, active_employment_count, matched_active_employments_count))
+
+        i = i + 1
+        logger.debug(f"Proccession personalesager {i} / {active_person_count}")
+
+    write_statistics_to_csv(statistics)
+    return
+
+
+def compile_statistics(cpr, sager_count, sager_closed_count, employment_count, matched_employment_count, active_employment_count, matched_active_employments_count):
+   return {
+        'person_id': cpr,
+        'sager_found': sager_count,
+        'cases_closed': sager_closed_count,
+        'employments_found': employment_count,
+        'matched_employments': matched_employment_count,
+        'active_employements': active_employment_count,
+        'matched_active_employments': matched_active_employments_count,
+    }
+
+
+def write_statistics_to_csv(statistics, filename='files/statistics.csv'):
+    with open(filename, 'w', newline='') as csvfile:
+        fieldnames = ['person_id', 'sager_found', 'cases_closed', 'employments_found', 'matched_employments', 'active_employements', 'matched_active_employments']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        for stat in statistics:
+            writer.writerow(stat)
+
+
+def combine_lists(nested_lists):
+    combined_list = []
+    for lst in nested_lists:
+        if isinstance(lst, list):
+            combined_list.extend(lst)
+        else:
+            combined_list.append(lst)
+    return combined_list
+
+def count_parameter_in_nested_list(nested_list, parameter_names, values):
+    def get_nested_value(structure, keys):
+        if isinstance(structure, list):
+            results = []
+            for item in structure:
+                result = get_nested_value(item, keys)
+                if result is not None:
+                    results.extend(result if isinstance(result, list) else [result])
+            return results
+        elif isinstance(structure, dict):
+            value = structure
+            for key in keys:
+                value = value.get(key, None)
+                if value is None:
+                    break
+            return [value] if value is not None else None
+        else:
+            return None
+
+    count = 0
+    for item in nested_list:
+        nested_values = get_nested_value(item, parameter_names)
+        if nested_values:
+            count += sum(1 for value in nested_values if value in values)
+    return count
+
+
+def fetch_institutions_and_departments(region_identifier):
+    path = 'GetOrganization'
+
+    # Define the SD params
+    params = {
+        'RegionCode': region_identifier,
+    }
+    inst_and_dep = []
+    try:
+        response = sd_client.post_request(path=path, params=params)
+
+        if not response:
+            logger.warning("No response from SD client")
+            return None
+
+        if not response['OrganizationInformation']:
+            logger.warning("OrganizationInformation object not found")
+            return None
+
+        if not response['OrganizationInformation']['Region']:
+            logger.warning("Region object not found")
+            return None
+        region = response['OrganizationInformation']['Region']
+
+        inst_list = region['Institution']
+        if not inst_list:
+            logger.warning("Institution list not found, or its empty")
+            return None
+
+        for inst in inst_list:
+
+            if not inst:
+                continue
+
+            if not inst['InstitutionCode'] or not inst['InstitutionCodeName']:
+                continue
+
+            inst_and_dep.append(inst)
+        write_json('files/institutions_and_departments.json', inst_and_dep)
+        return inst_and_dep
+
+    except Exception as e:
+        logger.error(f"Error while fetching inst and departments: {e} \n"
+                     f"Region code: {region_identifier}")
+        return []
+
+
+def fetch_inst_codes(inst_list):
+    inst_codes = []
+
+
+def fetch_departments(inst_list):
+    department_list = []
 
 
 def fetch_employments_changed(months_ago: int):
@@ -179,7 +334,7 @@ def fetch_employments_changed(months_ago: int):
 
             person_data = response['GetEmploymentChanged20111201'].get('Person', None)
             if not person_data:
-                logger.warning(f"No person data found for inst code: {inst_code}")
+                logger.warning(f"No employment changed data found for inst code: {inst_code}")
                 continue
 
             if isinstance(person_data, dict):
@@ -231,7 +386,7 @@ def fetch_employments(cpr_inst_list):
         cpr = cpr_and_inst[0]
         inst_codes = cpr_and_inst[1]
         logger.debug(cpr)
-        logger.debug((inst_codes))
+        logger.debug(inst_codes)
         for inst_code in inst_codes:
             # Define the SD params
             params = {
@@ -241,7 +396,7 @@ def fetch_employments(cpr_inst_list):
                 'EmploymentIdentifier': '',
                 'DepartmentIdentifier': '',
                 'ProfessionIndicator': 'false',
-                'DepartmentIndicator': 'false',
+                'DepartmentIndicator': 'true',
                 'WorkingTimeIndicator': 'false',
                 'SalaryCodeGroupIndicator': 'false',
                 'SalaryAgreementIndicator': 'false',
@@ -264,7 +419,7 @@ def fetch_employments(cpr_inst_list):
 
                 person_data = response['GetEmployment20111201'].get('Person', None)
                 if not person_data:
-                    logger.warning(f"No person data found for inst code: {inst_code}")
+                    logger.warning(f"No employment data found for inst code: {inst_code}")
                     continue
 
                 if isinstance(person_data, dict):
@@ -337,6 +492,7 @@ def extract_cpr_and_institution(person_list):
 
     return result
 
+
 def process_employments(employments, inst_code):
     try:
         if isinstance(employments, dict):
@@ -353,7 +509,7 @@ def process_employments(employments, inst_code):
     return employments
 
 
-def filter_persons_by_employment_status(person_list, active_status_codes, passive_status_codes):
+def filter_persons_by_employment_status(person_list):
     active_persons = []
     passive_persons = []
     try:
@@ -396,11 +552,77 @@ def filter_persons_by_employment_status(person_list, active_status_codes, passiv
     return active_persons, passive_persons
 
 
+def filter_employment_by_department(employment_list, department_code_list, sag_id, department_name):
+    filtered_employment = []
+    for department_code in department_code_list:
+        for employment in employment_list:
+            if employment.get('EmploymentDepartment', {}).get('DepartmentIdentifier') == department_code:
+                employment['MatchData'] = {
+                    'SagId': sag_id,
+                    'DepartmentName': department_name,
+                    'DepartmentCode': department_code
+                }
+                filtered_employment.append(employment)
+    return filtered_employment
+
+
+def find_department_codes(inst_list, sag_employment_location):
+    def recursive_search(department):
+        if isinstance(department, list):
+            codes = []
+            for dept in department:
+                result = recursive_search(dept)
+                if result:
+                    codes.extend(result['DepartmentCodes'])
+            return {
+                'DepartmentCodeName': sag_employment_location,
+                'DepartmentCodes': list(set(codes))  # Ensure unique codes
+            } if codes else None
+        elif isinstance(department, dict):
+            codes = []
+            if department.get('DepartmentCodeName') == sag_employment_location:
+                codes.append(department.get('DepartmentCode'))
+            # Recursively search within nested departments
+            if 'Department' in department and department['Department'] is not None:
+                result = recursive_search(department['Department'])
+                if result:
+                    codes.extend(result['DepartmentCodes'])
+            return {
+                'DepartmentCodeName': sag_employment_location,
+                'DepartmentCodes': list(set(codes))  # Ensure unique codes
+            } if codes else None
+        return None
+
+    all_codes = []
+    for institution in inst_list:
+        result = recursive_search(institution.get('Department', {}))
+        if result:
+            all_codes.append(result)
+
+    # Combine results for the same department name
+    combined_results = {}
+    for item in all_codes:
+        if item['DepartmentCodeName'] in combined_results:
+            combined_results[item['DepartmentCodeName']]['DepartmentCodes'].extend(item['DepartmentCodes'])
+            combined_results[item['DepartmentCodeName']]['DepartmentCodes'] = list(
+                set(combined_results[item['DepartmentCodeName']]['DepartmentCodes']))
+        else:
+            combined_results[item['DepartmentCodeName']] = item
+
+    # Convert combined results to a list
+    result_list = list(combined_results.values())
+
+    # Return a single object if there is exactly one match, otherwise return the list
+    if len(result_list) == 1:
+        return result_list[0]
+    return result_list
+
+
 def write_json(filename, data):
     # Write data to a JSON file
     with open(filename, 'w') as jsonfile:
-        json.dump(data, jsonfile, indent=4)
-    logger.debug(f"{filename} file created")
+        json.dump(data, jsonfile, ensure_ascii=False, indent=4)
+    # logger.debug(f"{filename} file created")
 
 
 def read_json_file(filename):
@@ -444,28 +666,30 @@ def fetch_active_personalesager(cpr: str):
     payload={
         "PrimaerPerson": {
             "CprNummer": cpr
-        },
-        "SagsTyper": [
-            {
-                "Id": 5 # Personalesag sagstype
-            }
-        ]
+        }
     }
     try:
         response = sbsys_client.sag_search(payload)
 
         if not response:
-            logger.info(f"sag_serach response is None - No personalesager found for cpr: {cpr}")
+            logger.info(f"sag_serach response is None - No sager found for cpr: {cpr}")
             return None
 
         # Fetch the sag objects from 'Results' in response
         sager = response.get('Results', None)
         if not sager:
-            logger.info(f"Results in sag_search is empty - No personalesager found for cpr: {cpr}")
+            logger.info(f"Results in sag_search is empty - No sager found for cpr: {cpr}")
             return None
 
-        # Filter active personalesager by checking if SagsStatus.Navn is 'Aktiv'
-        active_personalesager = [sag for sag in sager if sag.get('SagsStatus', {}).get('Navn') == 'Aktiv']
+        # Filter active sager by checking if SagsStatus.Navn is 'Aktiv'
+        active_sager = [sag for sag in sager if sag.get('SagsStatus', {}).get('Navn') == 'Aktiv']
+
+        if not active_sager:
+            logger.info(f"No active sager found for cpr: {cpr}")
+            return None
+
+        # Filter personalesager based on KLE and FACET numbers starting with "81.03.00-G01"
+        active_personalesager = [sag for sag in sager if sag.get('Nummer', '').startswith('81.03.00-G01')]
 
         if not active_personalesager:
             logger.info(f"No active personalesager found for cpr: {cpr}")
@@ -574,7 +798,7 @@ def extract_employment_dates(text):
         for match in matches:
             logger.debug("Found match: " + match)
             try:
-                parsed_date = parser.parse(match, fuzzy=True)
+                parsed_date = parser.parse(match, fuzzy=False)
                 formatted_date = parsed_date.strftime("%Y-%m-%d")
                 dates.append(formatted_date)
             except Exception as e:
