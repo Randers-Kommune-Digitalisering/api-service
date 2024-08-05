@@ -55,6 +55,7 @@ months_ago = 3
 def execute_lukning():
     # institutions_and_departments = fetch_institutions_and_departments("9R")
     institutions_and_departments = read_json_file('files/institutions_and_departments.json')
+
     # person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
 
     # cpr_list = extract_cpr_and_institution(read_json_file('files/employment_changed.json'))
@@ -81,8 +82,8 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
     i = 0
     active_person_count = len(active_person_list)
     for person in active_person_list:
-        # if i == 5:
-        #     break
+        if i == 20:
+            break
 
 
         cpr = person.get('PersonCivilRegistrationIdentifier', None)
@@ -236,43 +237,71 @@ def count_parameter_in_nested_list(nested_list, parameter_names, values):
 
 
 def fetch_institutions_and_departments(region_identifier):
-    path = 'GetOrganization'
-
-    # Define the SD params
-    params = {
-        'RegionCode': region_identifier,
-    }
     inst_and_dep = []
+    # Get institutions
+    path = 'GetInstitution20080201'
     try:
+        params = {
+            'RegionIdentifier': region_identifier
+        }
         response = sd_client.post_request(path=path, params=params)
 
         if not response:
             logger.warning("No response from SD client")
             return None
 
-        if not response['OrganizationInformation']:
-            logger.warning("OrganizationInformation object not found")
+        if not response['GetInstitution20080201']:
+            logger.warning("GetInstitution20080201 object not found")
             return None
 
-        if not response['OrganizationInformation']['Region']:
+        if not response['GetInstitution20080201']['Region']:
             logger.warning("Region object not found")
             return None
-        region = response['OrganizationInformation']['Region']
+        region = response['GetInstitution20080201']['Region']
 
-        inst_list = region['Institution']
-        if not inst_list:
-            logger.warning("Institution list not found, or its empty")
+
+        if not region['Institution']:
+            logger.warning("Institution list not found")
             return None
+        inst_list = region['Institution']
 
+        # Get departments
+        path = 'GetDepartment20080201'
+        date_today = datetime.now().strftime('%d.%m.%Y')
         for inst in inst_list:
+            institution_identifier = inst.get('InstitutionIdentifier', None)
+            institution_name = inst.get('InstitutionName', None)
 
-            if not inst:
+            if not institution_identifier or not institution_name:
+                logger.warning("InstitutionIdentifier or InstitutionName is None")
                 continue
+            # Define the SD params
+            params = {
+                'InstitutionIdentifier': institution_identifier,
+                'ActivationDate': date_today,
+                'DeactivationDate': date_today,
+                'DepartmentNameIndicator': 'true'
+            }
 
-            if not inst['InstitutionCode'] or not inst['InstitutionCodeName']:
-                continue
+            response = sd_client.post_request(path=path, params=params)
 
-            inst_and_dep.append(inst)
+            if not response:
+                logger.warning("No response from SD client")
+                return None
+
+            if not response['GetDepartment20080201']:
+                logger.warning("GetDepartment20080201 object not found")
+                return None
+
+            if not response['GetDepartment20080201']['Department']:
+                logger.warning("Department list not found")
+                return None
+            department_list = response['GetDepartment20080201']['Department']
+
+            inst_and_dep_dict = {'InstitutionIdentifier': institution_identifier,
+                                 'InstitutionName': institution_name,
+                                 'Department': department_list}
+            inst_and_dep.append(inst_and_dep_dict)
         write_json('files/institutions_and_departments.json', inst_and_dep)
         return inst_and_dep
 
@@ -580,8 +609,15 @@ def find_department_codes(inst_list, sag_employment_location):
             } if codes else None
         elif isinstance(department, dict):
             codes = []
-            if department.get('DepartmentCodeName') == sag_employment_location:
-                codes.append(department.get('DepartmentCode'))
+            department_name = department.get('DepartmentName', '')
+            # Ensure department_name is a string and not None
+            if isinstance(department_name, str):
+                # Check for partial match with full string
+                if sag_employment_location in department_name:
+                    codes.append(department.get('DepartmentIdentifier'))
+                # Check if DepartmentCodeName is exactly 30 characters
+                if len(department_name) == 30 and sag_employment_location.startswith(department_name):
+                    codes.append(department.get('DepartmentIdentifier'))
             # Recursively search within nested departments
             if 'Department' in department and department['Department'] is not None:
                 result = recursive_search(department['Department'])
@@ -672,7 +708,7 @@ def fetch_active_personalesager(cpr: str):
         response = sbsys_client.sag_search(payload)
 
         if not response:
-            logger.info(f"sag_serach response is None - No sager found for cpr: {cpr}")
+            logger.info(f"sag_search response is None - No sager found for cpr: {cpr}")
             return None
 
         # Fetch the sag objects from 'Results' in response
