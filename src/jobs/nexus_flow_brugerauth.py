@@ -24,8 +24,21 @@ def job():
 
 def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list):
     professional = _fetch_professional(primary_identifier)
+
     if not professional:
-        logger.error(f"Professional {primary_identifier} not found")
+        logger.info(f"Professional {primary_identifier} not found in Nexus - creating")
+        # TODO: Add filtering for which professionals to create
+        new_professional = _fetch_external_professional(primary_identifier)
+        if new_professional:
+            professional = nexus_client.post_request(professional['_links']['create']['href'], json=professional)
+            if professional:
+                logger.info(f"Professional {primary_identifier} created")
+            else:
+                logger.error(f"Failed to create professional {primary_identifier} - skipping")
+                return
+        else:
+            logger.error(f"Professional {primary_identifier} not found in external system - skipping")
+            return
 
     # Get all assigned organisations for professional as list of dicts - [0] being id, [1] being uuid
     professional_org_list = _fetch_professional_org_syncIds(professional)
@@ -76,6 +89,20 @@ def _fetch_professional(primary_identifier):
     # Find professional by query
     if len(nexus_client.find_professional_by_query(primary_identifier)) > 0:
         return nexus_client.find_professional_by_query(primary_identifier)[0]
+
+
+def _fetch_external_professional(primary_identifier):
+    res = nexus_client.find_external_professional_by_query(primary_identifier)
+    if 'reason' in res:
+        if res['reason'] == 'ProfessionalWithStsSnNotFetched':
+            return None
+        else:
+            raise Exception(f"Error fetching external professional: {res}")
+    else:
+        res['primaryIdentifier'] = primary_identifier
+        res['primaryAddress']['route'] = 'home:importProfessionalFromSts'
+        res['activeDirectoryConfiguration']['route'] = 'home:importProfessionalFromSts'
+        return res
 
 
 def _update_professional_organisations(professional, organisation_id_list):
