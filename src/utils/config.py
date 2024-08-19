@@ -50,3 +50,7 @@ BROWSERLESS_CLIENT_SECRET = os.environ["BROWSERLESS_CLIENT_SECRET"].strip()
 SD_USERNAME = os.environ["SD_USERNAME"].strip()
 SD_PASSWORD = os.environ["SD_PASSWORD"].strip()
 SD_URL = os.environ["SD_URL"].strip()
+
+# SD personalesag robot
+SD_PERSONALESAG_ROBOT_USERNAME = os.environ["SD_PERSONALESAG_ROBOT_USERNAME"].strip()
+SD_PERSONALESAG_ROBOT_PASSWORD = os.environ["SD_PERSONALESAG_ROBOT_PASSWORD"].strip()

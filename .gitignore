@@ -165,3 +165,4 @@ src/assets/*/tmp
 src/assets/*/tmp/*
 *.p12
 /src/files
+*.xml

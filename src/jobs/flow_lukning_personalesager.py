@@ -16,6 +16,7 @@ from dateutil.relativedelta import relativedelta
 from utils.config import (SD_USERNAME, SD_PASSWORD, SD_URL,
                               SBSYS_URL, SBSYS_PSAG_PASSWORD, SBSYS_PSAG_USERNAME,
                               SBSIP_PSAG_CLIENT_ID, SBSIP_PSAG_CLIENT_SECRET)
+from utils.browserless import browserless_sd_personalesag_files
 from sd.sd_client import SDClient
 from sbsys.sbsys_client import SbsysClient
 
@@ -50,12 +51,39 @@ sd_inst_codes = ["AI", "OV", "RS", "OR",
 active_status_codes = ["0", "1", "3"]
 passive_status_codes = ["7", "8", "9", "S"]
 
+
 months_ago = 3
 
 def execute_lukning():
     # institutions_and_departments = fetch_institutions_and_departments("9R")
     institutions_and_departments = read_json_file('files/institutions_and_departments.json')
 
+    active_person_list = read_json_file('files/active_persons.json')
+
+    passive_person_list = []
+    process_personalesager(active_person_list=active_person_list,
+                           passive_person_list=passive_person_list,
+                           delforloeb_title="01 Ansættelse",
+                           institutions_and_departments=institutions_and_departments)
+    return
+
+
+    i = 0
+    k = 0
+    range_count = 1
+    for x in range(range_count):
+        sag_id = find_personalesag_by_sd_employment(cpr="2003951483", employment_identifier="13263", inst_code="RG", institutions_and_departments=institutions_and_departments)
+        if not sag_id:
+            k = k + 1
+            logger.debug(f"Unsuccessful personalesag match count: {k} out of {range_count}")
+            continue
+        i = i + 1
+        logger.debug(f"Successful personalesag match count: {i} out of {range_count}")
+
+    logger.debug(f"Final tally of successful personalesag match count: {i} out of {range_count}")
+    logger.debug(f"Final tally of unsuccessful personalesag match count: {k} out of {range_count}")
+
+    return
     # person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
 
     # cpr_list = extract_cpr_and_institution(read_json_file('files/employment_changed.json'))
@@ -81,6 +109,50 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
     statistics = []
     i = 0
     active_person_count = len(active_person_list)
+    for person in active_person_list:
+        if i == 30:
+            break
+        cpr = person.get('PersonCivilRegistrationIdentifier', None)
+        employment_list = person.get('Employment', None)
+        employment_result_list = []
+        for employment in employment_list:
+            employment_status_code = employment.get('EmploymentStatus', None).get('EmploymentStatusCode', None)
+            if not employment_status_code in active_status_codes:
+                continue
+            employment_identifier = employment.get('EmploymentIdentifier', None)
+            inst_code = employment.get('InstitutionIdentifier', None)
+
+            # Merge the result of find_personalesag_by_sd_employment into the combined dictionary
+            sag = find_personalesag_by_sd_employment(
+                cpr=cpr,
+                employment_identifier=employment_identifier,
+                inst_code=inst_code,
+                institutions_and_departments=institutions_and_departments
+            )
+
+            sag_id = sag.get('Id', None)
+
+            # Combine the dictionaries into one
+            employment_result = {
+                'EmploymentIdentifier': employment_identifier,
+                'InstitutionIdentifier': inst_code,
+                'sag_id': sag_id
+            }
+
+            employment_result_list.append(employment_result)
+
+
+        combined_result = {
+            'cpr': cpr,
+            'result': employment_result_list
+        }
+        # Append the combined dictionary to the statistics list
+        statistics.append(combined_result)
+
+        i = i + 1
+        logger.debug(f"Proccession personalesager {i} / {active_person_count}")
+    write_json('files/statistics.json', statistics)
+    return
     for person in active_person_list:
         if i == 20:
             break
@@ -178,6 +250,190 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
     return
 
 
+def find_personalesag_by_sd_employment(cpr: str, employment_identifier: str, inst_code: str, institutions_and_departments: list):
+    # Fetch SD employment
+    employment = sd_client.GetEmployment20111201(cpr=cpr, employment_identifier=employment_identifier, inst_code=inst_code)
+    if not employment:
+        logger.warning(f"No employment found with cpr: {cpr}, employment_identifier: {employment_identifier}, or inst_code: {inst_code}")
+        return None
+
+    employment_location_code = employment.get('EmploymentDepartment', None).get('DepartmentIdentifier', None)
+    if not employment_location_code:
+        logger.warning(f"No department identifier found with cpr: {cpr}, employment_identifier: {employment_identifier}, and inst_code: {inst_code}")
+        return None
+
+    if not institutions_and_departments:
+        logger.warning(f"No institutions_and_departments were found on region code 9R")
+        return None
+
+    # Fetch the person active personalesager
+    sager = fetch_active_personalesager(cpr)
+
+    if not sager:
+        logger.warning(f"No sag found with cpr: {cpr}")
+        return
+
+    # Go through sager and compare ansaettelsessted from sag to DepartmentCode from SD employment
+    for sag in sager:
+        # Go through sager and compare ansaettelsessted from sag to DepartmentCode from SD employment
+        for sag in sager:
+            matched_sag = compare_sag_ansaettelssted(sag, employment, institutions_and_departments)
+            if matched_sag:
+                return matched_sag
+
+    input_strings = [f'{cpr} {employment_identifier}']
+    sd_employment_files = fetch_sd_employment_files(input_strings)
+    write_json('files/files_match_result/sd_files_result.json', sd_employment_files)
+
+    if not sd_employment_files:
+        logger.warning("sd_employment_files is None")
+        return None
+
+    sd_file_result = sd_employment_files.get('allResults', None)
+    if not sd_file_result:
+        logger.warning("sd_file_result is None")
+        return None
+
+    if not len(sd_file_result) == 1:
+        logger.warning(f"sd_file_result has a length of '{len(sd_file_result)}', but it should have a length of '1'")
+        return None
+
+    # Select the first element of the list with one element
+    sd_file_result = sd_file_result[0]
+    # Check if result is empty
+    if not sd_file_result['result']:
+        # Go through sager and compare ansaettelsessted from sag to DepartmentCode from SD employment
+        for sag in sager:
+            matched_sag = compare_sag_ansaettelssted(sag, employment, institutions_and_departments)
+            if matched_sag:
+              return matched_sag
+
+    # Go through sager and compare file name and archive date with personalesag in SD
+    for sag in sager:
+        sag_id = sag.get('Id', None)
+
+        if not sag_id:
+            logger.info(f"sag_id is None - No sag id found for sag with cpr: {cpr}")
+            continue
+
+        # Fetch the files from given delforloeb in current sag
+        matched_sag = compare_sag_and_results(sd_file_result, sag)
+        if not matched_sag:
+            continue
+
+        # logger.debug(matched_sag)
+        return matched_sag
+
+    return None
+
+
+def compare_sag_ansaettelssted(sag: dict, employment, institutions_and_departments):
+    sag_id = sag.get('Id', None)
+
+    if not sag_id:
+        logger.warning(f"sag_id is None - No sag id found in compare_sag_ansaettelssted")
+        return None
+
+    sag_employment_location = sag.get('Ansaettelsessted', None).get('Navn', None)
+    if not sag_employment_location:
+        logger.info(f"sag_employment_location is None - No Ansaettelsessted found on sag id: {sag_id}")
+        return None
+
+    department_codes = find_department_codes(institutions_and_departments, sag_employment_location)
+    if not department_codes:
+        logger.info(
+            f"department_codes is None - sag with id: {sag_id} {sag_employment_location} does not correspond with any SD departments")
+        return None
+
+    # Compare the sag_employment_location from personalesag to departmentname
+    employment_location_match_list = filter_employment_by_department([employment],
+                                                                     department_codes['DepartmentCodes'], sag_id,
+                                                                     sag_employment_location)
+    if len(employment_location_match_list) == 1 and employment_location_match_list[0]['MatchData']:
+        logger.info(f"Match found for ansaettelsessted between employment_identifier, and sag_id: "
+                    f"{employment_location_match_list[0].get('EmploymentIdentifier', None)}"
+                    f", {sag_id}")
+        return sag
+    elif len(employment_location_match_list) > 1:
+        logger.warning(
+            f"employment_location_match_list has a length of: {len(employment_location_match_list)} - It should have a legth of one, since there is only one employment")
+    else:
+        return None
+        logger.debug(
+            f"No personalesag match found for employment_identifier, and employment_department: {employment.get('EmploymentIdentifier', None)},"
+            f" {employment.get('EmploymentDepartment', None).get('DepartmentIdentifier', None)}"
+            f" \nFound sag with id, and location: {sag_id}, {sag_employment_location} - Which has department code {department_codes['DepartmentCodes']}")
+    return None
+
+
+def compare_sag_and_results(sd_result: dict, sag: dict):
+    sag_id = sag.get('Id', None)
+    if not sag_id:
+        logger.warning("compare_sag_and_results received None sag_id")
+        return None
+
+    if not sd_result:
+        logger.warning("compare_sag_and_results received None sd_result")
+        return None
+
+    # Fetch the files from given delforloeb in current sag
+    sag_documents = fetch_delforloeb_files(sag_id=sag_id, delforloeb_title="01 Ansættelse",
+                                              allowed_filetypes=[], document_keywords=[])
+    write_json(f'files/files_match_result/delforloeb_files{sag_id}.json', sag_documents)
+    if not sag_documents:
+        logger.info(f"sag with id: {sag_id} has no documents")
+        return None
+
+    logger.info(f"Comparing for inputString: {sd_result['inputString']}")
+
+    all_match = True  # Assume all documents will match initially
+
+    for document in sag_documents:
+        try:
+            # Convert RegistreringsDato to the same format as arkivdato for comparison
+            registrerings_dato = datetime.strptime(document['RegistreringsDato'], "%Y-%m-%dT%H:%M:%S.%f%z").strftime(
+                "%d.%m.%Y")
+        except ValueError:
+            # Handle cases where there might be no microseconds
+            registrerings_dato = datetime.strptime(document['RegistreringsDato'], "%Y-%m-%dT%H:%M:%S%z").strftime("%d.%m.%Y")
+
+        # Remove excess whitespace in document Navn
+        sag_navn = ' '.join(document['Navn'].split())
+
+        # Check if there's any item in sd_result that matches both navn and arkivdato
+        match_found = False
+        for item in sd_result['result']:
+            if item['navn'] == sag_navn and item['arkivdato'] == registrerings_dato:
+                # logger.info(f"Match found: {item} for sag: {sag_id}")
+                match_found = True
+                break
+
+        if not match_found:
+            # logger.info(f"No match found for document {document} in sag: {sag_id}")
+            all_match = False
+            break  # If any document doesn't match, we can stop the comparison
+
+    return sag if all_match else None
+
+
+def fetch_sd_employment_files(input_strings: list):
+    try:
+        # Make the request and get the response
+        response = browserless_sd_personalesag_files(input_strings)
+
+        # Check if the response status code is 200
+        if response.status_code == 200:
+            # Return the content if the status is 200
+            return response.json()  # Assuming the content is JSON
+        else:
+            # Handle the error case (you can raise an exception or return an error message)
+            raise Exception(f"Request failed with status code: {response.status_code}")
+    except Exception as e:
+        logger.error(f"fetch_sd_employment_files error: {e}")
+        return None
+
+
+
 def compile_statistics(cpr, sager_count, sager_closed_count, employment_count, matched_employment_count, active_employment_count, matched_active_employments_count):
    return {
         'person_id': cpr,
@@ -208,6 +464,7 @@ def combine_lists(nested_lists):
         else:
             combined_list.append(lst)
     return combined_list
+
 
 def count_parameter_in_nested_list(nested_list, parameter_names, values):
     def get_nested_value(structure, keys):
@@ -483,7 +740,7 @@ def fetch_employments(cpr_inst_list):
         logger.debug("Fetch employment: " + str(i) + "/" + str(len(cpr_inst_list)))
         i = i+1
 
-    # Write the flattened data to a JSON file
+    # Write data to a JSON file
     write_json('files/person_employments.json', person_list)
     return person_list
 
@@ -595,7 +852,7 @@ def filter_employment_by_department(employment_list, department_code_list, sag_i
     return filtered_employment
 
 
-def find_department_codes(inst_list, sag_employment_location):
+def find_department_codes(inst_list: list, sag_employment_location: str):
     def recursive_search(department):
         if isinstance(department, list):
             codes = []
@@ -697,14 +954,16 @@ def _get_first_and_last_day_x_months_ago(x: int):
 
 
 def fetch_active_personalesager(cpr: str):
-
-    # sag_search payload
-    payload={
-        "PrimaerPerson": {
-            "CprNummer": cpr
-        }
-    }
     try:
+        if len(cpr) == 10:
+            cpr = cpr[:6] + '-' + cpr[6:]  # Reformat the CPR
+
+        # sag_search payload
+        payload = {
+            "PrimaerPerson": {
+                "CprNummer": cpr
+            }
+        }
         response = sbsys_client.sag_search(payload)
 
         if not response:
@@ -725,7 +984,7 @@ def fetch_active_personalesager(cpr: str):
             return None
 
         # Filter personalesager based on KLE and FACET numbers starting with "81.03.00-G01"
-        active_personalesager = [sag for sag in sager if sag.get('Nummer', '').startswith('81.03.00-G01')]
+        active_personalesager = [sag for sag in active_sager if sag.get('Nummer', '').startswith('81.03.00-G01')]
 
         if not active_personalesager:
             logger.info(f"No active personalesager found for cpr: {cpr}")
@@ -734,12 +993,11 @@ def fetch_active_personalesager(cpr: str):
         return active_personalesager
 
     except Exception as e:
-        logger.error(f"Error while fetching active personalesager:  {e}")
+        logger.error(f"Error while fetching active personalesager: {e}")
+        return None
 
-    return
 
-
-def fetch_delforloeb_files(sag_id: int, delforloeb_title: str, allowed_filetypes: list):
+def fetch_delforloeb_files(sag_id: int, delforloeb_title: str, allowed_filetypes: list, document_keywords: list):
     try:
         # Fetch the list of delforloeb for a given sag
         delforloeb_list = sbsys_client.get_request(path=f"api/delforloeb/sag/{sag_id}")
@@ -773,28 +1031,7 @@ def fetch_delforloeb_files(sag_id: int, delforloeb_title: str, allowed_filetypes
             logger.info(f"No list of 'Dokumenter' found with delforloeb id: {delforloeb_id}")
             return None
 
-        # List of ansættelsesbrev keywords
-        document_keywords = ["ansættelsesbrev", "ansættelse", "ansættese", "ansæt", "Praktikoversigt",
-                        "Tilknytningskontrakt", "timeløn", "uddannelsesaftale"]
-
-        # Create list of documents that have given keywords in 'DokumentNavn'
-        filtered_files = []
-        for document in documents:
-            files = document.get('Filer', None)
-            if not files:
-                continue
-
-            if allowed_filetypes:
-                files = [file for file in files if file.get('Filendelse') in allowed_filetypes]
-
-            document_name = document.get('DokumentNavn', '').lower()
-            if document_name:  # Check if document_name is not an empty string
-                # Check if any keyword is in the document_name
-                if any(keyword.lower() in document_name for keyword in document_keywords):
-                    filtered_files.append(files)
-
-        # logger.debug(filtered_files)
-        return filtered_files
+        return documents
 
     except Exception as e:
         logger.error(f"Error during fetch_delforloeb_files: {e}")

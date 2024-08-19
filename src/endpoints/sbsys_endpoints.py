@@ -76,6 +76,7 @@ def fil_by_keyword():
                     if not file_content:
                         continue
 
+                    file_content = file_content.content
                     # Check if the file has allowed filetypes
                     if allowed_filetypes and not fil['Filendelse'].lower() in allowed_filetypes:
                         continue
@@ -90,6 +91,7 @@ def fil_by_keyword():
                         'data': encoded_file,
                         'mime_type': fil['MimeType']
                     })
+
 
         return jsonify(files), 200
     except Exception as e:
