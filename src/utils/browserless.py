@@ -162,13 +162,13 @@ if (dropdownItems.length > 0) {
   await page.waitForSelector('#userNameInput');
 
   // Type the username
-  await page.type('#userNameInput', 'laksen04\\\DQ99999');
+  await page.type('#userNameInput', """ + "'" + f"{SD_PERSONALESAG_ROBOT_USERNAME}" + "'" + """);
 
   // Wait for the password input field to be available
   await page.waitForSelector('#passwordInput');
 
   // Type the password
-  await page.type('#passwordInput', 'De3smaagrise!'); 
+  await page.type('#passwordInput', """ + "'" + f"{SD_PERSONALESAG_ROBOT_PASSWORD}" + "'" + """); 
 
   // Click the submit button
   await page.click('#submitButton');
