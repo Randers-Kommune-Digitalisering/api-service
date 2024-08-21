@@ -1,0 +1,106 @@
+{
+    "graphQueries": [
+        {
+            "parameterMap": {
+                "admUuid": "<uuid>"
+            },
+            "computeAvailablePages": false,
+            "graphQuery": {
+                "structure": {
+                    "alias": "adm",
+                    "userKey": "APOS-Types-AdministrativeUnit",
+                    "relations": [
+                        {
+                            "alias": "adm",
+                            "userKey": "APOS-Types-Engagement-TypeRelation-AdmUnit",
+                            "typeUserKey": "APOS-Types-Engagement",
+                            "direction": "IN",
+                            "relations": [
+                                {
+                                    "alias": "adm",
+                                    "userKey": "APOS-Types-Engagement-TypeRelation-AdmUnit",
+                                    "typeUserKey": "APOS-Types-Engagement",
+                                    "direction": "IN",
+                                    "relations": [
+                                        {
+                                            "alias": "adm",
+                                            "userKey": "APOS-Types-Engagement-TypeRelation-AdmUnit",
+                                            "typeUserKey": "APOS-Types-Engagement",
+                                            "direction": "IN",
+                                            "relations": [
+                                                {
+                                                    "alias": "adm",
+                                                    "userKey": "APOS-Types-Engagement-TypeRelation-AdmUnit",
+                                                    "typeUserKey": "APOS-Types-Engagement",
+                                                    "direction": "IN",
+                                                    "relations": [
+                                                        {
+                                                            "alias": "adm",
+                                                            "userKey": "APOS-Types-Engagement-TypeRelation-AdmUnit",
+                                                            "typeUserKey": "APOS-Types-Engagement",
+                                                            "direction": "IN"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "parameters": [
+                    {
+                        "key": "admUuid",
+                        "name": "Admin Org uuid"
+                    }
+                ],
+                "criteria": {
+                    "type": "AND",
+                    "criteria": [
+                        {
+                            "type": "MATCH",
+                            "operator": "EQUAL",
+                            "left": {
+                                "source": "DEFINITION",
+                                "alias": "adm.$uuid"
+                            },
+                            "right": {
+                                "source": "PARAMETER",
+                                "key": "admUuid"
+                            }
+                        },
+                        {
+                            "type": "MATCH",
+                            "operator": "EQUAL",
+                            "left": {
+                                "source": "DEFINITION",
+                                "alias": "adm.$state"
+                            },
+                            "right": {
+                                "source": "STATIC",
+                                "value": "STATE_ACTIVE"
+                            }
+                        }
+                    ]
+                },
+                "projection": {
+                    "children": {
+                            "children": {
+                                "children": {
+                                    "children": {
+                                        "children": {
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "validDate": "NOW",
+            "offset": 0,
+            "limit": 1
+        }
+    ]
+}

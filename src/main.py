@@ -1,12 +1,15 @@
 from flask import Flask
 from healthcheck import HealthCheck
 from prometheus_client import generate_latest
-# from apscheduler.schedulers.background import BackgroundScheduler
 
 from utils.logging import set_logging_configuration, APP_RUNNING
 from utils.config import DEBUG, PORT, POD_NAME
-# from background_job import test_job
-# from database import test_database
+from job_endpoints import job_api_bp
+from endpoints.nexus_endpoints import api_nexus_bp
+from endpoints.kp_endpoints import api_kp_bp
+from endpoints.sbsys_endpoints import api_sbsys_bp
+# from jobs.nexus_flow_lukning import execute_lukning
+# from kp.kp_client import KPClient
 
 
 def create_app():
@@ -14,29 +17,19 @@ def create_app():
     health = HealthCheck()
     app.add_url_rule("/healthz", "healthcheck", view_func=lambda: health.run())
     app.add_url_rule('/metrics', "metrics", view_func=generate_latest)
+    app.register_blueprint(job_api_bp)
+    app.register_blueprint(api_nexus_bp)
+    app.register_blueprint(api_kp_bp)
+    app.register_blueprint(api_sbsys_bp)
     APP_RUNNING.labels(POD_NAME).set(1)
     return app
 
-# def create_scheduler():
-#     scheduler = BackgroundScheduler()
-#     scheduler.add_job(test_job, 'interval', seconds=5) # Every 5 seconds
-#     scheduler.add_job(test_job, 'cron', day_of_week='mon', hour=7) # Every Monday at 7 AM
-#     return scheduler
-
 
 set_logging_configuration()
-# scheduler = create_scheduler()
 app = create_app()
-
-# @app.route('/test-database', methods=['GET'])
-# def test_database():
-#     ok = test_database()
-#     if ok:
-#         app.logger.info('Database ok')
-#         return ok
-#     return 'failed', 500
 
 
 if __name__ == "__main__":  # pragma: no cover
-    # scheduler.start()
     app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    # execute_lukning("111131-1112")
+    # fetch_lendings("111131-1112")
