@@ -19,6 +19,7 @@ DELTA_BASE_URL = os.environ['DELTA_BASE_URL'].strip()
 NEXUS_URL = os.environ["NEXUS_URL"].strip()
 NEXUS_CLIENT_ID = os.environ["NEXUS_CLIENT_ID"].strip()
 NEXUS_CLIENT_SECRET = os.environ["NEXUS_CLIENT_SECRET"].strip()
+NEXUS_TOKEN_ROUTE = os.environ["NEXUS_TOKEN_ROUTE"].strip()
 
 # KP
 KP_URL = os.environ["KP_URL"].strip()
