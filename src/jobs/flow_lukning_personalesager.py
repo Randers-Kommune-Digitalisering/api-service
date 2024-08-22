@@ -54,19 +54,94 @@ passive_status_codes = ["7", "8", "9", "S"]
 
 months_ago = 3
 
+def execute_lukning1():
+    person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
+
+    # cpr_list = extract_cpr_and_institution(read_json_file('files/employment_changed.json'))
+    cpr_list = extract_cpr_and_institution(person_employment_changed_list)
+
+    person_employment_list = fetch_employments(cpr_list)
+    # person_employment_list = read_json_file('files/person_employments.json')
+
+    active_person_list, passive_person_list = filter_persons_by_employment_status(person_employment_list)
+    # active_person_list = read_json_file('files/active_persons.json')
+
+def validate_matching_employments(matching_employments):
+    read_json_file('files/matching_employments.json')
+
+
 def execute_lukning():
-    # institutions_and_departments = fetch_institutions_and_departments("9R")
     institutions_and_departments = read_json_file('files/institutions_and_departments.json')
 
-    active_person_list = read_json_file('files/active_persons.json')
+    # find_personalesag_by_sd_employment("", "", "RG", institutions_and_departments)
+    # institutions_and_departments = fetch_institutions_and_departments("9R")
+    # institutions_and_departments = read_json_file('files/institutions_and_departments.json')
 
+    person_list = read_json_file('files/person_employments.json')
+
+    path = 'GetOrganization'
+
+    # Define the SD params
+    params = {
+        'RegionCode': '9R'
+
+    }
+    person = [{
+        "PersonCivilRegistrationIdentifier": "test",
+        "Employment": [
+            {
+                "EmploymentIdentifier": "07386",
+                "EmploymentDate": "2024-06-15",
+                "AnniversaryDate": "2024-06-15",
+                "EmploymentDepartment": {
+                    "ActivationDate": "2024-06-15",
+                    "DeactivationDate": "9999-12-31",
+                    "DepartmentIdentifier": "ÆNMD"
+                },
+                "EmploymentStatus": {
+                    "ActivationDate": "2024-06-15",
+                    "DeactivationDate": "2024-08-31",
+                    "EmploymentStatusCode": "1"
+                },
+                "InstitutionIdentifier": "RG"
+            },
+            {
+                "EmploymentIdentifier": "81431",
+                "EmploymentDate": "2023-09-18",
+                "AnniversaryDate": "2023-09-18",
+                "EmploymentDepartment": {
+                    "ActivationDate": "2023-09-18",
+                    "DeactivationDate": "9999-12-31",
+                    "DepartmentIdentifier": "ÆNMT"
+                },
+                "EmploymentStatus": {
+                    "ActivationDate": "2024-05-16",
+                    "DeactivationDate": "9999-12-31",
+                    "EmploymentStatusCode": "8"
+                },
+                "InstitutionIdentifier": "RG"
+            }
+        ]
+    }]
+    # organization = sd_client.get_request(path, params)
+    # organization = organization.get('OrganizationInformation', None)
+    # organization = organization.get('Region', None)
+    # institution = organization.get('Institution', [])
+    # write_json('files/institution_list.json', institution)
+
+    institution = read_json_file('files/institution_list.json')
+    # Get the matching employments
+    matching_employments = separate_employments(person_list, institution)
+    write_json('files/matching_employments.json', matching_employments)
+
+    return
     passive_person_list = []
+    active_person_list = read_json_file('files/active_persons.json')
     process_personalesager(active_person_list=active_person_list,
                            passive_person_list=passive_person_list,
                            delforloeb_title="01 Ansættelse",
                            institutions_and_departments=institutions_and_departments)
     return
-
 
     i = 0
     k = 0
@@ -84,16 +159,16 @@ def execute_lukning():
     logger.debug(f"Final tally of unsuccessful personalesag match count: {k} out of {range_count}")
 
     return
-    # person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
+    person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
 
     # cpr_list = extract_cpr_and_institution(read_json_file('files/employment_changed.json'))
-    # cpr_list = extract_cpr_and_institution(person_employment_changed_list)
+    cpr_list = extract_cpr_and_institution(person_employment_changed_list)
 
-    # person_employment_list = fetch_employments(cpr_list)
+    person_employment_list = fetch_employments(cpr_list)
     # person_employment_list = read_json_file('files/person_employments.json')
 
-    # active_person_list, passive_person_list = filter_persons_by_employment_status(person_employment_list)
-    active_person_list = read_json_file('files/active_persons.json')
+    active_person_list, passive_person_list = filter_persons_by_employment_status(person_employment_list)
+    # active_person_list = read_json_file('files/active_persons.json')
 
     passive_person_list = []
     process_personalesager(active_person_list=active_person_list,
@@ -102,15 +177,141 @@ def execute_lukning():
                            institutions_and_departments=institutions_and_departments)
 
 
+def find_matching_department(department, department_identifier):
+    """
+    Recursively searches for the department with the given DepartmentIdentifier
+    within the provided department structure.
+    """
+    if isinstance(department, dict):
+        # Check if the current department matches the given DepartmentIdentifier
+        if department.get('DepartmentCode') == department_identifier:
+            return department
+
+        # If 'Department' key exists, recursively search in the sub-departments
+        if 'Department' in department:
+            sub_department = department['Department']
+            if isinstance(sub_department, dict):
+                # Recursive call for a nested dictionary
+                result = find_matching_department(sub_department, department_identifier)
+                if result:
+                    return result
+            elif isinstance(sub_department, list):
+                # Recursive call for a list of sub-departments
+                for sub_dept in sub_department:
+                    result = find_matching_department(sub_dept, department_identifier)
+                    if result:
+                        return result
+
+    # Return None if no matching department is found
+    return None
+
+
+def separate_employments(person_list, inst_list):
+    """
+    Separates employments into MatchedEmployments and Employments based on the criteria.
+    """
+
+    def find_level_3_sub_department(department, department_identifier):
+        if isinstance(department, dict):
+            department_level = department.get('DepartmentLevel')
+            if department_level == '3':
+                return department
+            if 'Department' in department:
+                sub_department = department['Department']
+                if isinstance(sub_department, dict):
+                    result = find_level_3_sub_department(sub_department, department_identifier)
+                    if result:
+                        return result
+                elif isinstance(sub_department, list):
+                    for sub_dept in sub_department:
+                        result = find_level_3_sub_department(sub_dept, department_identifier)
+                        if result:
+                            return result
+        elif isinstance(department, list):
+            for sub_dept in department:
+                result = find_level_3_sub_department(sub_dept, department_identifier)
+                if result:
+                    return result
+        return None
+
+    def find_matching_employments(employments, institution):
+        matched = {}
+        unmatched = []
+
+        for employment in employments:
+            dept_id = employment.get('EmploymentDepartment', {}).get('DepartmentIdentifier')
+            level_3_department = find_level_3_sub_department(institution, dept_id)
+
+            if not level_3_department:
+                # Employment doesn't belong to any level 3 sub-department
+                unmatched.append(employment)
+                continue
+
+            matching_dept = find_matching_department(level_3_department, dept_id)
+            if matching_dept:
+                dept_level = matching_dept.get('DepartmentLevel')
+                key = (level_3_department.get('DepartmentCode'), dept_level)
+
+                if key not in matched:
+                    matched[key] = []
+                matched[key].append(employment)
+            else:
+                # If no matching department found in the level 3 sub-department
+                unmatched.append(employment)
+
+        matched_employments = [matches for matches in matched.values() if len(matches) > 1]
+
+        return matched_employments, unmatched
+
+    for person in person_list:
+        employments = person.get('Employment', [])
+        matched_employments_list = []
+        remaining_employments = []
+
+        # Group employments by InstitutionIdentifier
+        institutions_group = {}
+        for employment in employments:
+            inst_identifier = employment.get('InstitutionIdentifier', "")
+            if inst_identifier not in institutions_group:
+                institutions_group[inst_identifier] = []
+            institutions_group[inst_identifier].append(employment)
+
+        for inst_identifier, institution_employments in institutions_group.items():
+            matching_institutions = [institution for institution in inst_list if
+                                     institution.get('InstitutionCode') == inst_identifier]
+            institution = matching_institutions[0] if matching_institutions else None
+
+            if not institution:
+                # If no institution matches, add employments to unmatched
+                remaining_employments.extend(institution_employments)
+                continue
+
+            matched_employments, unmatched_employments = find_matching_employments(institution_employments, institution)
+
+            if matched_employments:
+                matched_employments_list.extend(matched_employments)
+            # Add unmatched employments back to the remaining employments
+            remaining_employments.extend(unmatched_employments)
+
+        # Assign matched and unmatched employments back to the person object
+        person['MatchedEmployments'] = matched_employments_list
+        person['Employment'] = remaining_employments
+
+    return person_list
+
+
 def process_personalesager(active_person_list: list, passive_person_list: list, delforloeb_title: str, institutions_and_departments: list):
     for person in passive_person_list:
         break
 
-    statistics = []
+    statistics_json = []
+    statistics_csv = []
     i = 0
     active_person_count = len(active_person_list)
-    for person in active_person_list:
-        if i == 30:
+    start_index = 11
+    for i in range(start_index, len(active_person_list)):
+        person = active_person_list[i]
+        if i == start_index + 1:
             break
         cpr = person.get('PersonCivilRegistrationIdentifier', None)
         employment_list = person.get('Employment', None)
@@ -141,17 +342,39 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
 
             employment_result_list.append(employment_result)
 
-
         combined_result = {
             'cpr': cpr,
             'result': employment_result_list
         }
         # Append the combined dictionary to the statistics list
-        statistics.append(combined_result)
+        statistics_json.append(combined_result)
 
         i = i + 1
         logger.debug(f"Proccession personalesager {i} / {active_person_count}")
-    write_json('files/statistics.json', statistics)
+
+        # Reformat cpr to include '-' -required Sbsys cpr formatting
+        cpr = cpr[:6] + "-" + cpr[6:]
+
+        # Fetch the person active personalesager
+        sager = fetch_active_personalesager(cpr)
+
+        if not sager:
+            continue
+
+        personale_sager_count = len(sager)
+        sager_closed_count = 0
+        employment_count = len(employment_list)
+        total_employment_match_count = 0
+        active_employment_count = count_parameter_in_nested_list(employment_list,
+                                                                 ["EmploymentStatus", "EmploymentStatusCode"],
+                                                                 active_status_codes)
+        matched_active_employments_count = len(combined_result.get('result', []))
+        statistics_csv.append(compile_statistics(cpr, personale_sager_count, sager_closed_count, employment_count,
+                                             total_employment_match_count, active_employment_count,
+                                             matched_active_employments_count))
+
+    write_json('files/statistics.json', statistics_json)
+    write_statistics_to_csv(statistics_csv, 'files/statistics.csv')
     return
     for person in active_person_list:
         if i == 20:
@@ -275,11 +498,9 @@ def find_personalesag_by_sd_employment(cpr: str, employment_identifier: str, ins
 
     # Go through sager and compare ansaettelsessted from sag to DepartmentCode from SD employment
     for sag in sager:
-        # Go through sager and compare ansaettelsessted from sag to DepartmentCode from SD employment
-        for sag in sager:
-            matched_sag = compare_sag_ansaettelssted(sag, employment, institutions_and_departments)
-            if matched_sag:
-                return matched_sag
+        matched_sag = compare_sag_ansaettelssted(sag, employment, institutions_and_departments)
+        if matched_sag:
+            return matched_sag
 
     input_strings = [f'{cpr} {employment_identifier}']
     sd_employment_files = fetch_sd_employment_files(input_strings)
@@ -306,7 +527,7 @@ def find_personalesag_by_sd_employment(cpr: str, employment_identifier: str, ins
         for sag in sager:
             matched_sag = compare_sag_ansaettelssted(sag, employment, institutions_and_departments)
             if matched_sag:
-              return matched_sag
+                return matched_sag
 
     # Go through sager and compare file name and archive date with personalesag in SD
     for sag in sager:
