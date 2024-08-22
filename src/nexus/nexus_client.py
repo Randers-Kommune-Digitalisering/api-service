@@ -54,7 +54,7 @@ class NexusAPIClient(BaseAPIClient):
             return None
 
     def refresh_access_token(self):
-        token_url = f"{self.base_url}{NEXUS_TOKEN_ROUTE}"
+        token_url = f"{self.base_url}/{NEXUS_TOKEN_ROUTE}"
         payload = {
             "grant_type": "refresh_token",
             "client_id": self.client_id,
