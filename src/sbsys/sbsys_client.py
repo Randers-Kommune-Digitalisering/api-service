@@ -33,6 +33,11 @@ class SbsysAPIClient(BaseAPIClient):
         return client
 
     def request_access_token(self):
+        logger.info(SBSIP_URL)
+        logger.info(self.client_id)
+        logger.info(self.client_secret)
+        logger.info(self.username)
+        logger.info(self.password)
         token_url = f"{SBSIP_URL}/auth/realms/sbsip/protocol/openid-connect/token"
         payload = {
             "grant_type": "password",
