@@ -58,7 +58,6 @@ def fil_by_keyword():
             if not isinstance(data['allowedFiletypes'], list):
                 return jsonify({"error": "allowedFiletypes must be a list of strings. e.g. ['pdf', 'docs']"})
             allowed_filetypes = data['allowedFiletypes']
-
         documents_response = sbsys_client.fetch_documents(data['sagID'])
         if not documents_response:
             return jsonify({"error": f"No documents were found with sag id: {data['sagID']}"}), 404
