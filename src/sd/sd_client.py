@@ -125,13 +125,12 @@ class SDClient:
         except Exception as e:
             logger.error(f"An error occurred while perform delete_request: {e}")
 
-    def GetEmployment20111201(self, cpr, employment_identifier, inst_code, effective_date = None):
-        path = 'GetEmployment20111201'
+    def GetEmployment20070401(self, cpr, employment_identifier, inst_code, effective_date = None):
+        path = 'GetEmployment20070401'
 
         if not effective_date:
             # Get the current date and format it as DD.MM.YYYY
             effective_date = datetime.now().strftime('%d.%m.%Y')
-
         # Define the SD params
         params = {
             'InstitutionIdentifier': inst_code,
@@ -157,14 +156,16 @@ class SDClient:
                 logger.warning("No response from SD client")
                 return None
 
-            if not response['GetEmployment20111201']:
-                logger.warning("GetEmployment20111201 object not found")
+            if not response['GetEmployment20070401']:
+                logger.warning("GetEmployment20070401 object not found")
                 return None
 
-            person_data = response['GetEmployment20111201'].get('Person', None)
+            person_data = response['GetEmployment20070401'].get('Person', None)
             if not person_data:
                 logger.warning(f"No employment data found for cpr: {cpr}")
                 return None
+
+            return person_data
 
             if isinstance(person_data, dict):
                 person_data = [person_data]
@@ -176,7 +177,7 @@ class SDClient:
                     return None
                 return employment
         except Exception as e:
-            logger.error(f"An error occured GetEmployment20111201: {e}")
+            logger.error(f"An error occured GetEmployment20070401: {e}")
 
 
 def xml_to_json(xml_data):

@@ -8,6 +8,7 @@ import io
 import csv
 from pdf2image import convert_from_bytes
 import pytesseract
+from collections import defaultdict
 
 from dateutil import parser
 from datetime import datetime
@@ -54,27 +55,63 @@ passive_status_codes = ["7", "8", "9", "S"]
 
 months_ago = 3
 
-def execute_lukning1():
-    person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
-
-    # cpr_list = extract_cpr_and_institution(read_json_file('files/employment_changed.json'))
-    cpr_list = extract_cpr_and_institution(person_employment_changed_list)
-
-    person_employment_list = fetch_employments(cpr_list)
+def execute_lukning():
+    validate_matching_employments()
+    return
+    # person_employment_changed_list = fetch_employments_changed(months_ago=months_ago)
+    institution_list = read_json_file('files/institution_list.json')
+    person_list = read_json_file('files/employment_changed.json')
+    #cpr_list = extract_cpr_and_institution(read_json_file('files/employment_changed.json'),institution_list)
+    # cpr_list = extract_cpr_and_institution(person_employment_changed_list)
+    test_person = [{
+        "PersonCivilRegistrationIdentifier": "test",
+        "Employment": [
+            {
+                "EmploymentIdentifier": "00997",
+                "EmploymentDate": "2024-05-01",
+                "AnniversaryDate": "2021-11-21",
+                "EmploymentStatus": {
+                    "ActivationDate": "2024-05-01",
+                    "DeactivationDate": "2024-09-30",
+                    "EmploymentStatusCode": "1"
+                },
+                "InstitutionIdentifier": "RG"
+            }
+        ]
+    }]
+    person_employment_list = fetch_employments(person_list, institution_list)
     # person_employment_list = read_json_file('files/person_employments.json')
 
-    active_person_list, passive_person_list = filter_persons_by_employment_status(person_employment_list)
+    # Get the matching employments
+    matching_employments = separate_employments(person_employment_list, institution_list)
+    write_json('files/matching_employments.json', matching_employments)
+
+
+
+    # active_person_list, passive_person_list = filter_persons_by_employment_status(person_employment_list)
     # active_person_list = read_json_file('files/active_persons.json')
 
-def validate_matching_employments(matching_employments):
-    read_json_file('files/matching_employments.json')
+def validate_matching_employments():
+    matching_employments = read_json_file('files/matching_employments.json')
+    total_match_count = 0
+    total_unmatch_count = 0
+    for emp in matching_employments:
+        match_count = emp.get('EmploymentMatchCount', None)
+        unmatch_count = emp.get('EmploymentUnmatchCount', None)
+        sbsys = emp.get('Sbsys', {})
+        if not isinstance(match_count, int) or not isinstance(unmatch_count, int) or not sbsys:
+            # logger.warning("match_count, unmatch_count, sbsys is None")
+            continue
+
+        if match_count + unmatch_count == sbsys.get('SagerCount', 0):
+            total_match_count = total_match_count + 1
+        else:
+            total_unmatch_count = total_unmatch_count + 1
+    logger.debug(f"total_match_count: {total_match_count}")
+    logger.debug(f"total_unmatch_count: {total_unmatch_count}")
 
 
-def execute_lukning():
-    institutions_and_departments = read_json_file('files/institutions_and_departments.json')
-
-    # find_personalesag_by_sd_employment("", "", "RG", institutions_and_departments)
-    # institutions_and_departments = fetch_institutions_and_departments("9R")
+def execute_lukning1():
     # institutions_and_departments = read_json_file('files/institutions_and_departments.json')
 
     person_list = read_json_file('files/person_employments.json')
@@ -86,43 +123,7 @@ def execute_lukning():
         'RegionCode': '9R'
 
     }
-    person = [{
-        "PersonCivilRegistrationIdentifier": "test",
-        "Employment": [
-            {
-                "EmploymentIdentifier": "07386",
-                "EmploymentDate": "2024-06-15",
-                "AnniversaryDate": "2024-06-15",
-                "EmploymentDepartment": {
-                    "ActivationDate": "2024-06-15",
-                    "DeactivationDate": "9999-12-31",
-                    "DepartmentIdentifier": "ÆNMD"
-                },
-                "EmploymentStatus": {
-                    "ActivationDate": "2024-06-15",
-                    "DeactivationDate": "2024-08-31",
-                    "EmploymentStatusCode": "1"
-                },
-                "InstitutionIdentifier": "RG"
-            },
-            {
-                "EmploymentIdentifier": "81431",
-                "EmploymentDate": "2023-09-18",
-                "AnniversaryDate": "2023-09-18",
-                "EmploymentDepartment": {
-                    "ActivationDate": "2023-09-18",
-                    "DeactivationDate": "9999-12-31",
-                    "DepartmentIdentifier": "ÆNMT"
-                },
-                "EmploymentStatus": {
-                    "ActivationDate": "2024-05-16",
-                    "DeactivationDate": "9999-12-31",
-                    "EmploymentStatusCode": "8"
-                },
-                "InstitutionIdentifier": "RG"
-            }
-        ]
-    }]
+    person = []
     # organization = sd_client.get_request(path, params)
     # organization = organization.get('OrganizationInformation', None)
     # organization = organization.get('Region', None)
@@ -177,33 +178,39 @@ def execute_lukning():
                            institutions_and_departments=institutions_and_departments)
 
 
-def find_matching_department(department, department_identifier):
+def find_matching_department(department, department_identifier, latest_level_3_department=None):
     """
     Recursively searches for the department with the given DepartmentIdentifier
-    within the provided department structure.
+    within the provided department structure. Also keeps track of the latest
+    level 3 department encountered.
     """
+
     if isinstance(department, dict):
         # Check if the current department matches the given DepartmentIdentifier
         if department.get('DepartmentCode') == department_identifier:
-            return department
+            return latest_level_3_department, department
+
+        # Check if the current department is level 3 and update the latest_level_3_department
+        if department.get('DepartmentLevel') == '3':
+            latest_level_3_department = department
 
         # If 'Department' key exists, recursively search in the sub-departments
         if 'Department' in department:
             sub_department = department['Department']
             if isinstance(sub_department, dict):
                 # Recursive call for a nested dictionary
-                result = find_matching_department(sub_department, department_identifier)
-                if result:
-                    return result
+                level_3_dept, matching_dept = find_matching_department(sub_department, department_identifier, latest_level_3_department)
+                if matching_dept:
+                    return level_3_dept, matching_dept
             elif isinstance(sub_department, list):
                 # Recursive call for a list of sub-departments
                 for sub_dept in sub_department:
-                    result = find_matching_department(sub_dept, department_identifier)
-                    if result:
-                        return result
+                    level_3_dept, matching_dept = find_matching_department(sub_dept, department_identifier, latest_level_3_department)
+                    if matching_dept:
+                        return level_3_dept, matching_dept
 
     # Return None if no matching department is found
-    return None
+    return None, None
 
 
 def separate_employments(person_list, inst_list):
@@ -211,57 +218,65 @@ def separate_employments(person_list, inst_list):
     Separates employments into MatchedEmployments and Employments based on the criteria.
     """
 
-    def find_level_3_sub_department(department, department_identifier):
-        if isinstance(department, dict):
-            department_level = department.get('DepartmentLevel')
-            if department_level == '3':
-                return department
-            if 'Department' in department:
-                sub_department = department['Department']
-                if isinstance(sub_department, dict):
-                    result = find_level_3_sub_department(sub_department, department_identifier)
-                    if result:
-                        return result
-                elif isinstance(sub_department, list):
-                    for sub_dept in sub_department:
-                        result = find_level_3_sub_department(sub_dept, department_identifier)
-                        if result:
-                            return result
-        elif isinstance(department, list):
-            for sub_dept in department:
-                result = find_level_3_sub_department(sub_dept, department_identifier)
-                if result:
-                    return result
-        return None
+    def find_parent_level_3_department(institution, department_identifier):
+        """
+        Finds the level 3 department in the institution that contains the department
+        with the given department_identifier.
+        """
+
+        if not institution:
+            logger.warning("Institution is None")
+            return None
+
+        department_list = institution.get('Department', None)
+        if not department_list:
+            logger.warning(
+                f"Department list in institution {institution.get('AdministrationInstitutionCode', '')} is empty")
+            return None
+
+        for department in department_list:
+            level_3_dept, matching_dept = find_matching_department(department, department_identifier)
+            # If the returned tuple is (None, None), continue with the next iteration
+            if level_3_dept is None and matching_dept is None:
+                continue
+            return level_3_dept, matching_dept
+
+        return None, None
 
     def find_matching_employments(employments, institution):
-        matched = {}
+        matched = []
         unmatched = []
+        department_list = []
 
         for employment in employments:
-            dept_id = employment.get('EmploymentDepartment', {}).get('DepartmentIdentifier')
-            level_3_department = find_level_3_sub_department(institution, dept_id)
+            dept_id = employment.get('Department', {}).get('DepartmentIdentifier')
+            level_3_and_sub_department = find_parent_level_3_department(institution, dept_id)
 
-            if not level_3_department:
-                # Employment doesn't belong to any level 3 sub-department
+            if not level_3_and_sub_department or level_3_and_sub_department == (None, None):
+                # Employment doesn't belong to any level 3 sub-department or no match found
                 unmatched.append(employment)
                 continue
 
-            matching_dept = find_matching_department(level_3_department, dept_id)
-            if matching_dept:
-                dept_level = matching_dept.get('DepartmentLevel')
-                key = (level_3_department.get('DepartmentCode'), dept_level)
+            department_list.append((level_3_and_sub_department, employment))
 
-                if key not in matched:
-                    matched[key] = []
-                matched[key].append(employment)
+        # Group by DepartmentCode in the first tuple element (level_3_dept)
+        department_code_groups = defaultdict(list)
+        for (level_3_dept, sub_dept), employment in department_list:
+            dept_code = level_3_dept.get('DepartmentCode')
+            department_code_groups[dept_code].append((sub_dept, employment))
+
+        # Find matches where more than one employment exists within the same DepartmentCode group
+        for dept_code, grouped_employments in department_code_groups.items():
+            if len(grouped_employments) > 1:
+                # Add matched employments to the matched list
+                matched.append([employment for _, employment in grouped_employments])
+            elif len(grouped_employments) == 1:
+                unmatched.append([employment for _, employment in grouped_employments])
             else:
-                # If no matching department found in the level 3 sub-department
-                unmatched.append(employment)
+                continue
 
-        matched_employments = [matches for matches in matched.values() if len(matches) > 1]
 
-        return matched_employments, unmatched
+        return matched, unmatched
 
     for person in person_list:
         employments = person.get('Employment', [])
@@ -293,10 +308,46 @@ def separate_employments(person_list, inst_list):
             # Add unmatched employments back to the remaining employments
             remaining_employments.extend(unmatched_employments)
 
-        # Assign matched and unmatched employments back to the person object
-        person['MatchedEmployments'] = matched_employments_list
-        person['Employment'] = remaining_employments
+        cpr = person.get('PersonCivilRegistrationIdentifier', "")
+        sager = fetch_active_personalesager(cpr=cpr)
 
+        if sager:
+            person['Sbsys'] = {}
+            person['Sbsys']['SagerCount'] = len(sager)
+            person['Sbsys']['Sager'] = []
+            for sag in sager:
+                sag_dict = {
+                    "Id": sag.get('Id', ""),
+                    "Ansættelsessted":  sag.get('Ansaettelsessted', {}).get('Navn', "")
+                }
+                person['Sbsys']['Sager'].append(sag_dict)
+        # Assign matched and unmatched employments back to the person object
+        person['EmploymentMatch'] = matched_employments_list
+        person['EmploymentUnmatch'] = remaining_employments
+        person['EmploymentMatchCount'] = len(matched_employments_list)
+        person['EmploymentUnmatchCount'] = len(remaining_employments)
+
+        # Flatten matched_employments_list and combine with remaining_employments
+        all_processed_employments = []
+        for match_group in matched_employments_list:
+            for emp in match_group:
+                all_processed_employments.append(emp)
+        for unmatched_emp in remaining_employments:
+            if isinstance(unmatched_emp, dict):
+                all_processed_employments.append(unmatched_emp)
+            elif isinstance(unmatched_emp, list):
+                for emp in unmatched_emp:
+                    all_processed_employments.append(emp)
+
+        # Convert lists to sets of employment identifiers for comparison
+        processed_ids = {emp['EmploymentIdentifier'] for emp in all_processed_employments if isinstance(emp, dict)}
+        original_ids = {emp['EmploymentIdentifier'] for emp in person.get('Employment', [])}
+
+        # Check if the processed employments match the original 'Employment' list
+        if processed_ids == original_ids:
+            person['Employment'] = person.get('Employment', [])
+        else:
+            person['EmploymentMismatch'] = "Mismatch between processed employments and original employments."
     return person_list
 
 
@@ -880,24 +931,65 @@ def fetch_employments_changed(months_ago: int):
     return person_list
 
 
-def fetch_employments(cpr_inst_list):
+def fetch_employments(person_list, inst_list):
     # Get the current date and format it as DD.MM.YYYY
     effective_date = datetime.now().strftime('%d.%m.%Y')
 
-    person_list = []
     # Fetch changed employments foreach SD institution code
     i = 1
-    for cpr_and_inst in cpr_inst_list:
-        path = 'GetEmployment20111201'
+    employments_in_institutions = []
+    result_person_list = []
 
-        cpr = cpr_and_inst[0]
-        inst_codes = cpr_and_inst[1]
-        logger.debug(cpr)
-        logger.debug(inst_codes)
-        for inst_code in inst_codes:
+    for inst in inst_list:
+        inst_code = inst['InstitutionCode']
+        person_employment_list = sd_client.GetEmployment20070401(cpr="", employment_identifier="", inst_code=inst_code)
+        institution = {
+            "InstitutionIdentifier": inst_code,
+            "Person": person_employment_list,
+
+        }
+        if not person_employment_list:
+            employments_in_institutions.append(institution)
+            continue
+        employments_in_institutions.append(institution)
+    # write_json('files/employments_in_institutions.json', employments_in_institutions)
+    employments_in_institutions = read_json_file('files/employments_in_institutions.json')
+    empty_institution_list = [inst for inst in employments_in_institutions if not inst['Person']]
+    non_empty_institution_list = [inst for inst in employments_in_institutions if inst['Person']]
+
+    for person_outer in person_list:
+        cpr = person_outer['PersonCivilRegistrationIdentifier']
+        employments = []
+        for inst in non_empty_institution_list:
+            persons = inst.get('Person', None)
+            inst_identifier = inst['InstitutionIdentifier']
+            if isinstance(persons, dict):
+                if persons['PersonCivilRegistrationIdentifier'] == cpr:
+                    # If 'Employment' is an object, change to array, and add inst_code
+                    employments.append(process_employments(persons['Employment'], inst_identifier))
+            elif isinstance(persons, list):
+                for person_inner in persons:
+                    if person_inner['PersonCivilRegistrationIdentifier'] == cpr:
+                        # If 'Employment' is an object, change to array, and add inst_code
+                        employments.append(process_employments(person_inner['Employment'], inst_identifier))
+                        break
+        employments = [item for sublist in employments for item in sublist]
+
+        result_person_list.append({
+            "PersonCivilRegistrationIdentifier": cpr,
+            "Employment": employments
+        })
+        for inst in empty_institution_list:
+            inst_identifier = inst.get('InstitutionIdentifier', None)
+            if not inst_identifier:
+                logger.error("fetch_employments InstitutionIdentifier is None")
+                return
+
+            path = 'GetEmployment20111201'
+
             # Define the SD params
             params = {
-                'InstitutionIdentifier': inst_code,
+                'InstitutionIdentifier': inst_identifier,
                 'EmploymentStatusIndicator': 'true',
                 'PersonCivilRegistrationIdentifier': cpr,
                 'EmploymentIdentifier': '',
@@ -926,23 +1018,23 @@ def fetch_employments(cpr_inst_list):
 
                 person_data = response['GetEmployment20111201'].get('Person', None)
                 if not person_data:
-                    logger.warning(f"No employment data found for inst code: {inst_code}")
+                    logger.warning(f"No employment data found for inst code: {inst_identifier}")
                     continue
 
                 if isinstance(person_data, dict):
                     person_data = [person_data]
 
                 for person in person_data:
-                    employment = person.get('Employment', None)
+                    employment = person.get('Employment', [])
                     if not employment:
                         logger.warning(f"Person has no employment object: {person} ")
                         continue
 
                     # If 'Employment' is an object, change to array, and add inst_code
-                    person['Employment'] = process_employments(employment, inst_code)
+                    person['Employment'] = process_employments(employment, inst_identifier)
 
                     # Check if the person is already in the person_list
-                    existing_person = next((p for p in person_list if p['PersonCivilRegistrationIdentifier'] == person[
+                    existing_person = next((p for p in result_person_list if p['PersonCivilRegistrationIdentifier'] == person[
                         'PersonCivilRegistrationIdentifier']), None)
 
                     if existing_person:
@@ -950,24 +1042,45 @@ def fetch_employments(cpr_inst_list):
                         existing_person['Employment'].extend(person['Employment'])
                     else:
                         # If person does not exist, add to person_list
-                        person_list.append(person)
+                        result_person_list.append(person)
 
                 # json_data = json.dumps(person_list, indent=4)
                 # logger.debug(json_data)
             except Exception as e:
-                logger.error(f"Error while fetching employments changed: {e} \n"
-                             f"inst code: {inst_code}")
+                logger.error(f"Error while fetching employments: {e} \n"
+                             f"inst code: {inst_identifier}")
                 return None
-        logger.debug("Fetch employment: " + str(i) + "/" + str(len(cpr_inst_list)))
+        logger.debug("Fetch employment: " + str(i) + "/" + str(len(result_person_list)))
         i = i+1
 
     # Write data to a JSON file
-    write_json('files/person_employments.json', person_list)
-    return person_list
+    write_json('files/person_employments.json', result_person_list)
+    return result_person_list
 
 
 def extract_cpr_and_institution(person_list):
     result = []
+    person_list = [{
+        "PersonCivilRegistrationIdentifier": "2002671908",
+        "Employment": [
+            {
+                "EmploymentIdentifier": "EAAAF",
+                "EmploymentDate": "2024-05-27",
+                "AnniversaryDate": "2024-05-27",
+                "EmploymentDepartment": {
+                    "ActivationDate": "2024-05-27",
+                    "DeactivationDate": "9999-12-31",
+                    "DepartmentIdentifier": "ZBRÅ"
+                },
+                "EmploymentStatus": {
+                    "ActivationDate": "2024-06-22",
+                    "DeactivationDate": "9999-12-31",
+                    "EmploymentStatusCode": "8"
+                },
+                "InstitutionIdentifier": "OV"
+            }
+        ]
+    }]
     try:
         for person in person_list:
             cpr = person.get("PersonCivilRegistrationIdentifier")
@@ -1008,9 +1121,26 @@ def process_employments(employments, inst_code):
             logger.error(f"Unexpected 'Employment' type: {type(employments)}")
             return []
 
+        inst_and_department = read_json_file('files/institutions_and_departments.json')
         # Add InstitutionIdentifier to each employment object
+
         for employment in employments:
             employment["InstitutionIdentifier"] = inst_code
+            if employment.get('EmploymentDepartment', {}):
+                employment['Department'] = employment.pop('EmploymentDepartment')
+            # List comprehension to retrieve the matching department for each employment
+            matching_department = [
+                dept for inst in inst_and_department for dept in inst.get('Department', [])
+                if dept['DepartmentIdentifier'] == employment.get('Department', {}).get('DepartmentIdentifier')
+            ]
+
+            if len(matching_department) == 1:
+                # If a matching department is found, assign the DepartmentName and DepartmentLevel
+                employment['Department']['DepartmentName'] = matching_department[0]['DepartmentName']
+                employment["Department"]["DepartmentLevel"] = matching_department[0]['DepartmentLevelCode']
+            else:
+                logger.warning(f"process_employments: matching_department has a length of {len(matching_department)}, it should have len 1 ")
+            employment["Department"]["Level3Parent"] = "hej"
     except Exception as e:
         logger.error(f"Error during process_employments: {e}")
     return employments
