@@ -138,6 +138,21 @@ class KPAPIClient(BaseAPIClient):
         # Override _make_request to handle specific behavior for KPAPIClient
         try:
             response = super()._make_request(method, path, **kwargs)
+            headers = response.get('Headers', {})
+            if headers:
+                content_type = headers.get('Content-Type', '')
+
+                if 'text/html' in content_type.lower():
+                    if not self.auth_attempted:
+                        logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
+                        self.authenticate()  # Attempt to fetch new session token
+                        headers = self.get_headers()  # Update headers with new session token
+                        self.auth_attempted = True
+                        return method(path, headers=headers, **kwargs)  # Retry the request
+
+                    if self.auth_attempted:
+                        self.auth_attempted = False
+                        logger.warning("Fetching new session token failed")
             return response
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401 and self.auth_attempted is False:
