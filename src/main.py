@@ -11,8 +11,8 @@ from endpoints.kp_endpoints import api_kp_bp
 from endpoints.sbsys_endpoints import api_sbsys_bp
 # from jobs.nexus_flow_lukning import execute_lukning
 # from kp.kp_client import KPClient
-from jobs.flow_lukning_personalesager import execute_lukning
-
+# from jobs.flow_lukning_personalesager import execute_lukning
+from jobs.lukning_personalesager import execute_lukning
 
 def create_app():
     app = Flask(__name__)

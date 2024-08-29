@@ -130,7 +130,7 @@ class SDClient:
 
         if not effective_date:
             # Get the current date and format it as DD.MM.YYYY
-            effective_date = datetime.now().strftime('%d.%m.%Y')
+            effective_date = "01.01.5000"
         # Define the SD params
         params = {
             'InstitutionIdentifier': inst_code,

@@ -9,7 +9,7 @@ import pytesseract
 from collections import defaultdict
 
 from dateutil import parser
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 from utils.config import (SD_USERNAME, SD_PASSWORD, SD_URL,
@@ -103,7 +103,34 @@ def is_person_eligible_for_closing(employments):
 
 def is_sag_eligible_for_closing(sag):
 
+    # Calculate the date that is 3 months ago from today
+    three_months_ago = datetime.now() - timedelta(days=3 * 30)
+
+    # Iterate through all employments in the sag
+    employments = sag.get('Employments', [])
+    if not employments:
+        logger.warning("is_sag_eligible_for_closing: employments in sag is empty")
+        return False
+
+    if isinstance(employments, dict):
+        employments = [employments]
+
+    for employment in employments:
+        # Check if the EmploymentStatusCode is not in the passive status codes
+        employment_status_code = str(employment.get('EmploymentStatus', {}).get('EmploymentStatusCode'))
+        if employment_status_code not in passive_status_codes:
+            return False
+
+        # Check if the ActivationDate is within the last 3 months
+        activation_date_str = employment.get('EmploymentStatus', {}).get('ActivationDate')
+        if activation_date_str:
+            activation_date = datetime.strptime(activation_date_str, '%Y-%m-%d')
+            if activation_date > three_months_ago:
+                return False
+
+    # If all conditions are met, return True
     return True
+
 
 
 def fetch_employments_changed(months_ago: int, inst_and_departments: list):
@@ -703,6 +730,7 @@ def match_employments_to_personalesager(person):
     person['DepartmentCompareSuccess'] = comparison_success
     # After processing, `person['Sbsys']['Sager']` should now include the relevant Employment details
     return person
+
 
 def fetch_active_personalesager(cpr: str):
     try:
