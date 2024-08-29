@@ -1,6 +1,4 @@
 import logging
-import requests
-import json
 import json
 import re
 import PyPDF2
@@ -26,22 +24,7 @@ sd_client = SDClient(SD_USERNAME, SD_PASSWORD, SD_URL)
 sbsys_client = SbsysClient(SBSIP_PSAG_CLIENT_ID, SBSIP_PSAG_CLIENT_SECRET,
                            SBSYS_PSAG_USERNAME, SBSYS_PSAG_PASSWORD, SBSYS_URL)
 
-date_patterns = [
-        r"Du er fra den (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4}) ansat",
-        r"Du er fra (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4}) ansat",
-        r"du fra den (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4}) er ansat",
-        r"Du er fra (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4}) til",
-        r"Anseet .dato (\d{2}\.\d{2}\.\d{4})",
-        r"Startdato: (\d{2}-\d{2}-\d{4})",
-        r"Du vil blive ansat i perioden (\d{6})",
-        r"fra den (\d{2}\/\d{2}\s\d{4})",
-        r"Ansat den (\d{2}\.\d{2}\.\d{4})",
-        r"Aftalen\s*begynder\s*\(dato\)\s*:\s*(\d{2}\.\d{2}\.\d{4})",
-        r"Praktikforlab\s*(\d{2}-\d{2}-\d{4})",
-        r"Tilknytningsdato\s*:\s*(\d{1,2}\.\s*[a-zA-Z]+\s*\d{4})",
-        r"Tilknytningsdato : (\d{1,2}\.\s*[a-zA-Z]+\s*\d{4})",
-        r"Ansættelsesdato\s*:\s*(\d{1,2}\.\s*[a-zA-Z]+\s*\d{4})",
-]
+
 sd_inst_codes = ["AI", "OV", "RS", "OR",
                  "OB", "OW", "OY", "OQ",
                  "RQ", "OX", "RY", "BQ",
@@ -64,23 +47,11 @@ def execute_lukning():
     #cpr_list = extract_cpr_and_institution(read_json_file('files/employment_changed.json'),institution_list)
     # cpr_list = extract_cpr_and_institution(person_employment_changed_list)
     test_person = [{
-        "PersonCivilRegistrationIdentifier": "test",
-        "Employment": [
-            {
-                "EmploymentIdentifier": "00997",
-                "EmploymentDate": "2024-05-01",
-                "AnniversaryDate": "2021-11-21",
-                "EmploymentStatus": {
-                    "ActivationDate": "2024-05-01",
-                    "DeactivationDate": "2024-09-30",
-                    "EmploymentStatusCode": "1"
-                },
-                "InstitutionIdentifier": "RG"
-            }
-        ]
+        "PersonCivilRegistrationIdentifier": "2007742986",
+        "Employment": []
     }]
-    person_employment_list = fetch_employments(person_list, institution_list)
-    # person_employment_list = read_json_file('files/person_employments.json')
+    # person_employment_list = fetch_employments(test_person, institution_list)
+    person_employment_list = read_json_file('files/person_employments.json')
 
     # Get the matching employments
     matching_employments = separate_employments(person_employment_list, institution_list)
@@ -98,12 +69,25 @@ def validate_matching_employments():
     for emp in matching_employments:
         match_count = emp.get('EmploymentMatchCount', None)
         unmatch_count = emp.get('EmploymentUnmatchCount', None)
+
         sbsys = emp.get('Sbsys', {})
         if not isinstance(match_count, int) or not isinstance(unmatch_count, int) or not sbsys:
             # logger.warning("match_count, unmatch_count, sbsys is None")
             continue
+        sager = sbsys.get('Sager', [])
 
-        if match_count + unmatch_count == sbsys.get('SagerCount', 0):
+        # Remove duplicates based on "Ansættelsessted"
+        unique_dict_list = []
+        seen = set()
+
+        for d in sager:
+            ansaettelsessted = d.get("Ansættelsessted")
+            if ansaettelsessted not in seen:
+                seen.add(ansaettelsessted)
+                unique_dict_list.append(d)
+
+        # sager = sbsys.get('SagerCount', 0)
+        if match_count + unmatch_count == len(unique_dict_list):
             total_match_count = total_match_count + 1
         else:
             total_unmatch_count = total_unmatch_count + 1
@@ -308,24 +292,40 @@ def separate_employments(person_list, inst_list):
             # Add unmatched employments back to the remaining employments
             remaining_employments.extend(unmatched_employments)
 
+        # Assign matched and unmatched employments back to the person object
+        person['EmploymentMatch'] = matched_employments_list
+        person['EmploymentUnmatch'] = remaining_employments
+        person['EmploymentMatchCount'] = len(matched_employments_list)
+        person['EmploymentUnmatchCount'] = len(remaining_employments)
+
         cpr = person.get('PersonCivilRegistrationIdentifier', "")
         sager = fetch_active_personalesager(cpr=cpr)
 
+        person['Sbsys'] = {}
+        person['Sbsys']['Sager'] = []
         if sager:
-            person['Sbsys'] = {}
             person['Sbsys']['SagerCount'] = len(sager)
-            person['Sbsys']['Sager'] = []
+
             for sag in sager:
                 sag_dict = {
                     "Id": sag.get('Id', ""),
                     "Ansættelsessted":  sag.get('Ansaettelsessted', {}).get('Navn', "")
                 }
                 person['Sbsys']['Sager'].append(sag_dict)
-        # Assign matched and unmatched employments back to the person object
-        person['EmploymentMatch'] = matched_employments_list
-        person['EmploymentUnmatch'] = remaining_employments
-        person['EmploymentMatchCount'] = len(matched_employments_list)
-        person['EmploymentUnmatchCount'] = len(remaining_employments)
+        else:
+            person_list.remove(person)
+            continue
+        if len(matched_employments_list) + len(remaining_employments) == len(person['Sbsys']['Sager']):
+            person['DepartmentCompareSuccess'] = True
+        else:
+            person['DepartmentCompareSuccess'] = False
+
+        person['DepartmentCompare'] = {
+            'Ansættelsessted': [sag['Ansættelsessted'] for sag in person['Sbsys']['Sager'] if 'Ansættelsessted' in sag],
+            'DepartmentIdentifier': [department['Department']['DepartmentName'] for department in
+                                     person['Employment'] if
+                                     'Department' in department and 'DepartmentName' in department['Department']]
+        }
 
         # Flatten matched_employments_list and combine with remaining_employments
         all_processed_employments = []
@@ -941,6 +941,7 @@ def fetch_employments(person_list, inst_list):
     result_person_list = []
 
     for inst in inst_list:
+        break
         inst_code = inst['InstitutionCode']
         person_employment_list = sd_client.GetEmployment20070401(cpr="", employment_identifier="", inst_code=inst_code)
         institution = {
@@ -1054,7 +1055,7 @@ def fetch_employments(person_list, inst_list):
         i = i+1
 
     # Write data to a JSON file
-    write_json('files/person_employments.json', result_person_list)
+    write_json('files/person_employments_2007742986.json', result_person_list)
     return result_person_list
 
 
@@ -1410,37 +1411,3 @@ def extract_text_with_ocr(file_like, language='dan'):
     if ocr_text != "":
         logger.debug("ocr_text found")
     return ocr_text
-
-
-def extract_employment_dates(text):
-    # Regex pattern to match different date formats
-
-    dates = []
-    for pattern in date_patterns:
-        logger.debug("trying date pattern: " + pattern)
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        for match in matches:
-            logger.debug("Found match: " + match)
-            try:
-                parsed_date = parser.parse(match, fuzzy=False)
-                formatted_date = parsed_date.strftime("%Y-%m-%d")
-                dates.append(formatted_date)
-            except Exception as e:
-                print(f"Error parsing date '{match}': {e}")
-
-    return dates
-
-
-def read_pdf_and_extract_dates(file_like):
-    # Extract text from PDF using PyPDF2
-    text = extract_text_from_pdf(file_like)
-
-    # If no text is extracted, use OCR to extract text
-    if not text.strip():
-        logger.debug("No text was found, trying ocr")
-        file_like.seek(0)  # Reset file pointer to the beginning
-        text = extract_text_with_ocr(file_like)
-
-    # Extract dates from the text
-    employment_dates = extract_employment_dates(text)
-    return employment_dates
