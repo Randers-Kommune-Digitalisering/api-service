@@ -87,8 +87,8 @@ def execute_lukning():
             SD_to_sbsys_personalesager.append(matched_employments)
 
         for person in person_list:
-            continue
-            # employments = fetch_employments(person, institutions_flattened)
+            break
+            employments = fetch_employments(person, institutions_flattened)
         write_json('files/SD_to_sbsys_personalesager.json', SD_to_sbsys_personalesager)
     except Exception as e:
         logger.error(f"Error during execute_lukning: {e}")
@@ -219,7 +219,7 @@ def fetch_employments_changed(months_ago: int, inst_and_departments: list):
     return person_list
 
 
-def fetch_institutions_and_departments(region_identifier):
+def fetch_institutions_flattened(region_identifier):
     inst_and_dep = []
     # Get institutions
     path = 'GetInstitution20080201'
@@ -294,7 +294,7 @@ def fetch_institutions_and_departments(region_identifier):
         return []
 
 
-def fetch_institution(region_identifier):
+def fetch_institution_nested(region_identifier):
     path = 'GetOrganization'
 
     # Define the SD params
@@ -664,7 +664,7 @@ def _get_first_and_last_day_x_months_ago(x: int):
 
 
 def match_employments_to_personalesager(person):
-    if not person.get('DepartmentCompareSuccess', None):
+    if not person.get('DepartmentCompareSuccess', False):
         return None
 
     # Initialize the comparison success flag to True
