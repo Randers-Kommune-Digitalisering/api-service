@@ -82,6 +82,24 @@ def fil_by_keyword():
                         'data': encoded_file,
                         'mime_type': fil['MimeType']
                     })
+        if not files:
+            for document in documents_response:
+                for fil in document['Filer']:
+                    file_content = sbsys_client.fetch_file(fil['ShortId'])
+                    if not file_content:
+                        continue
+
+                    if allowed_filetypes and not fil['Filendelse'].lower() in allowed_filetypes:
+                        continue
+
+                    encoded_file = base64.b64encode(file_content).decode('utf-8')
+                    files.append({
+                        'filename': fil['Filnavn'],
+                        'document_name': document['Navn'],
+                        'data': encoded_file,
+                        'mime_type': fil['MimeType']
+                    })
+
 
         return jsonify(files), 200
     except Exception as e:
