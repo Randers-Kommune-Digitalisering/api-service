@@ -1,4 +1,4 @@
-from src.jobs.flow_lukning_personalesager import extract_cpr_and_institution, extract_employment_dates
+from src.jobs.SD_SBSYS_psag-integration_analyse import extract_cpr_and_institution, extract_employment_dates
 import pytest
 
 
