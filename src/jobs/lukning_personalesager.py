@@ -780,17 +780,18 @@ def close_personalesager(person):
     sager = person.get('Sbsys', {}).get('Sager', {})
 
     if not sager:
-        logger.warning(f"close_personalesager: Sager not found for person,")
+        logger.warning("close_personalesager: Sager not found for person,")
         return None
 
     for sag in sager:
         if not is_sag_eligible_for_closing(sag):
-            logger.info(f"Sag is not eligible for closing, Id: {sag.get('Id', "")}")
+            id = sag.get('Id', "")
+            logger.info(f"Sag is not eligible for closing, Id: {id}")
             sag['isSagClosed'] = False
             continue
 
         if not check_database_connection():
-            logger.warning(f"Database connection failed. Aborting personalesag closing..")
+            logger.warning("Database connection failed. Aborting personalesag closing..")
             return None
 
         sag = close_sag(sag)
@@ -801,7 +802,7 @@ def close_personalesager(person):
 def close_sag(sag):
     sag_id = sag.get('Id', "")
     if not sag_id:
-        logger.warning(f"close_sag: sag_id is none")
+        logger.warning("close_sag: sag_id is none")
 
     #TODO Udfør erindringer, journaliser kladder, sæt status til Lukket
     sag['isSagClosed'] = True

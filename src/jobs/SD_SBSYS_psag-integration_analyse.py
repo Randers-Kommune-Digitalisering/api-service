@@ -504,7 +504,7 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
                 # Use BytesIO to handle file content in memory
                 with io.BytesIO(file) as f:
                     logger.debug(f)
-                    employment_dates = read_pdf_and_extract_dates(f)
+                    employment_dates = None
                     # Handle the extracted dates as needed
                     logger.debug(f"Employment Dates: {employment_dates}")
                     return employment_dates
@@ -515,12 +515,12 @@ def process_personalesager(active_person_list: list, passive_person_list: list, 
         total_employment_match_count = len(combine_lists(employment_match_list))
         active_employment_count = count_parameter_in_nested_list(employment_list, ["EmploymentStatus", "EmploymentStatusCode"], active_status_codes)
         matched_active_employments_count = count_parameter_in_nested_list(combine_lists(employment_match_list), ["EmploymentStatus", "EmploymentStatusCode"], active_status_codes)
-        statistics.append(compile_statistics(cpr, personale_sager_count, sager_closed_count, employment_count, total_employment_match_count, active_employment_count, matched_active_employments_count))
+        # statistics.append(compile_statistics(cpr, personale_sager_count, sager_closed_count, employment_count, total_employment_match_count, active_employment_count, matched_active_employments_count))
 
         i = i + 1
         logger.debug(f"Proccession personalesager {i} / {active_person_count}")
 
-    write_statistics_to_csv(statistics)
+    # write_statistics_to_csv(statistics)
     return
 
 
