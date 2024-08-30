@@ -96,7 +96,7 @@ def validate_matching_employments():
 
 
 def execute_lukning1():
-    # institutions_and_departments = read_json_file('files/institutions_and_departments.json')
+    institutions_and_departments = read_json_file('files/institutions_and_departments.json')
 
     person_list = read_json_file('files/person_employments.json')
 
