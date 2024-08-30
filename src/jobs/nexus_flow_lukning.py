@@ -61,9 +61,7 @@ def iterate_dead_list():
                                 request3 = NexusRequest(input_response=patient, link_href="audit", method="GET")
                                 patient_changes = execute_nexus_flow([request3])
                                 # Find the the latest change to current state and get the datetime
-                                time_set_dead_last = max([x for x in patient_changes['auditEntries'] if x['type'] == 'CHANGE' and
-                                                          next((y for y in x['changes'] if y.get('translation', {}).get('keyName', '').upper() == 'BORGERSTATUS'
-                                                                and y.get('translation', {}).get('newValue', '').upper() == 'DØD'), None)], key=lambda c: c["date"], default={}).get("date", None)
+                                time_set_dead_last = max([x for x in patient_changes['auditEntries'] if x['type'] == 'CHANGE' and next((y for y in x['changes'] if y.get('translation', {}).get('keyName', '').upper() == 'BORGERSTATUS' and y.get('translation', {}).get('newValue', '').upper() == 'DØD'), None)], key=lambda c: c["date"], default={}).get("date", None)
                                 if time_set_dead_last:
                                     now = datetime.now(timezone.utc)
                                     if (now - parse(time_set_dead_last)) > timedelta(hours=hours_elapsed_before_handling):
