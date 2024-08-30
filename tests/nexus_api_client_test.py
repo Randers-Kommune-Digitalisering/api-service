@@ -69,7 +69,7 @@ def test_delete_request(nexus_client, requests_mock):
     assert response == mock_response
 
 
-def test_request_access_token_success(nexus_client, requests_mock):
+# def test_request_access_token_success(nexus_client, requests_mock):
     #url = nexus_url + "/authx/realms/randers/protocol/openid-connect/token"
     #mock_response = {
     #    "access_token": "test_access_token",
@@ -85,7 +85,7 @@ def test_request_access_token_success(nexus_client, requests_mock):
     #assert nexus_client.refresh_token == mock_response["refresh_token"]
 
 
-def test_refresh_access_token_success(nexus_client, requests_mock):
+# def test_refresh_access_token_success(nexus_client, requests_mock):
     #url = nexus_url + "/authx/realms/randers/protocol/openid-connect/token"
     #mock_response = {
     #    "access_token": "new_test_access_token",
