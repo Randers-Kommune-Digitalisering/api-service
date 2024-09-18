@@ -1,3 +1,4 @@
+import os
 import pytest
 from unittest.mock import patch
 from nexus.nexus_client import NexusAPIClient
@@ -70,7 +71,7 @@ def test_delete_request(nexus_client, requests_mock):
 
 
 def test_request_access_token_success(nexus_client, requests_mock):
-    url = nexus_url + "/authx/realms/randers/protocol/openid-connect/token"
+    url = nexus_url + '/' + os.environ["NEXUS_TOKEN_ROUTE"]
     mock_response = {
         "access_token": "test_access_token",
         "expires_in": 3600,
@@ -86,7 +87,7 @@ def test_request_access_token_success(nexus_client, requests_mock):
 
 
 def test_refresh_access_token_success(nexus_client, requests_mock):
-    url = nexus_url + "/authx/realms/randers/protocol/openid-connect/token"
+    url = nexus_url + '/' + os.environ["NEXUS_TOKEN_ROUTE"]
     mock_response = {
         "access_token": "new_test_access_token",
         "expires_in": 3600,
