@@ -40,8 +40,8 @@ class BaseAPIClient(ABC):
 
         except requests.exceptions.RequestException as e:
             logger.error(e)
-            if response.content:
-                logger.error(response.content)
+            # if response.content:
+            #    logger.error(response.content)
             return None
 
     def get(self, path, **kwargs):
