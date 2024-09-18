@@ -131,7 +131,6 @@ class KPAPIClient(BaseAPIClient):
     def get_auth_headers(self):
         session_cookie = self.authenticate()
         headers = {"Cookie": f"JSESSIONID={session_cookie}"}
-        print(headers)
         return headers
 
     def _make_request(self, method, path, **kwargs):
