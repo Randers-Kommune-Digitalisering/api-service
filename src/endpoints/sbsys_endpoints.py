@@ -100,7 +100,6 @@ def fil_by_keyword():
                         'mime_type': fil['MimeType']
                     })
 
-
         return jsonify(files), 200
     except Exception as e:
         return jsonify({"error": f"{e}"}), 500

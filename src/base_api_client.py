@@ -32,12 +32,12 @@ class BaseAPIClient(ABC):
                 if isinstance(response_data, list):
                     return {"results": response_data}
                 return response_data
-            
+
             except json.JSONDecodeError:
                 if not response.content:
                     return 'success'
                 return response.content
-            
+
         except requests.exceptions.RequestException as e:
             logger.error(e)
             if response.content:

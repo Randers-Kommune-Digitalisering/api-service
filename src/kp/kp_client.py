@@ -187,24 +187,24 @@ class KPClient:
             "sortField": ""
         }
         return self.api_client.post(path, json=payload)
-    
+
     def get_person(self, id: str):
         path = f"rest/api/person/overview/{id}"
         return self.api_client.get(path)
-    
+
     def get_pension(self, id: str):
         path = f"rest/api/person/overview/{id}/pensionsoplysninger"
         return self.api_client.get(path)
-    
+
     def get_cases(self, id: str):
         path = f"rest/api/person/overview/{id}/sager?types=aktiv"
         return self.api_client.get(path)
-    
+
     def get_personal_supplement(self, id: str):
         path = f"rest/api/person/history/{id}/personligTillaegsprocent"
         response = self.api_client.get(path)
         return response
-    
+
     def get_health_supplement(self, id: str):
         path = f"rest/api/person/history/{id}/helbredstillaegsprocent"
         response = self.api_client.get(path)
