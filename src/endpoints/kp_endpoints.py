@@ -58,7 +58,7 @@ def get_person():
                 id = response.get('personSearches')[0].get('id')
 
         if not id:
-            return jsonify({"error": "No person id found"}), 400
+            return jsonify({"cpr": cpr, "error": True, "message": "No KP user ID was found using CPR. CPR likely does not exist in KP"}), 400
 
         # Get personal details
         response = kp_client.get_person(id)
