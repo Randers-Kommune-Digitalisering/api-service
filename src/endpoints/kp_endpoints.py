@@ -53,7 +53,7 @@ def get_person():
         if cpr and not id:
             response = kp_client.search_person(cpr)
             if response is None:
-                return jsonify({"error": "No response"}), 400
+                return jsonify({"error": "No response"}), 500
             else:
                 id = response.get('personSearches')[0].get('id')
 
@@ -63,7 +63,7 @@ def get_person():
         # Get personal details
         response = kp_client.get_person(id)
         if response is None:
-            return jsonify({"error": "No response"}), 400
+            return jsonify({"error": "No response"}), 500
 
         # Get cases
         cases = kp_client.get_cases(id)
