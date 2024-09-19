@@ -208,3 +208,8 @@ class KPClient:
         path = f"rest/api/person/history/{id}/helbredstillaegsprocent"
         response = self.api_client.get(path)
         return response
+
+    def get_special_information(self, id: str):
+        path = f"rest/api/warning/person/{id}"
+        response = self.api_client.get(path)
+        return response

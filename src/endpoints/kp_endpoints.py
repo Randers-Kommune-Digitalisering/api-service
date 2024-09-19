@@ -85,6 +85,11 @@ def get_person():
         if health_supplement:
             response['helbredstillaegsprocent'] = health_supplement.get('results')
 
+        # Get special information
+        special_information = kp_client.get_special_information(id)
+        if special_information:
+            response['saerligeOplysninger'] = special_information.get('results')
+
         return jsonify(response)
 
     except Exception as e:
