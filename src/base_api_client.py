@@ -17,23 +17,31 @@ class BaseAPIClient(ABC):
 
     def _make_request(self, method, path, **kwargs):
         headers = self.get_auth_headers()
+
         if path.startswith("http://") or path.startswith("https://"):
             url = path
         else:
             url = f"{self.base_url}/{path}"
+
         try:
             response = method(url, headers=headers, **kwargs)
             response.raise_for_status()
+
             try:
-                return response.json()
+                response_data = response.json()
+                if isinstance(response_data, list):
+                    return {"results": response_data}
+                return response_data
+
             except json.JSONDecodeError:
                 if not response.content:
                     return 'success'
                 return response.content
+
         except requests.exceptions.RequestException as e:
             logger.error(e)
-            if response.content:
-                logger.error(response.content)
+            # if response.content:
+            #    logger.error(response.content)
             return None
 
     def get(self, path, **kwargs):
