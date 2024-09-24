@@ -31,6 +31,7 @@ class KPAPIClient(BaseAPIClient):
 
     def request_session_token(self):
         login_url = self.base_url
+        # TODO: URL should be in config - preferably as a env var - maybe just add /function to the base URL here ?
         url = "https://browserless.prototypes.randers.dk/function"
         headers = {
             "Content-Type": "application/javascript",
@@ -110,6 +111,7 @@ class KPAPIClient(BaseAPIClient):
         response = requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID,
                                                                                      password=BROWSERLESS_CLIENT_SECRET))
         # Parse the JSON response
+        # TODO: Handle errors - what if response.content is not JSON? - and a better way to read JSON is to use the response class' json method: response.json()
         data = json.loads(response.content)
 
         # Initialize session_cookie
@@ -137,6 +139,7 @@ class KPAPIClient(BaseAPIClient):
         # Override _make_request to handle specific behavior for KPAPIClient
         try:
             response = super()._make_request(method, path, **kwargs)
+            print(response)
             headers = response.get('Headers', {})
             if headers:
                 content_type = headers.get('Content-Type', '')
@@ -167,6 +170,7 @@ class KPAPIClient(BaseAPIClient):
 
 
 class KPClient:
+    # TODO: add error handling for incorrect credentials - maybe add more general error handling as well ?
     def __init__(self, username, password):
         self.api_client = KPAPIClient.get_client(username, password)
 

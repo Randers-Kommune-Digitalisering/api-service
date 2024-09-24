@@ -30,6 +30,15 @@ app = create_app()
 
 
 if __name__ == "__main__":  # pragma: no cover
-    app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
+    # app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
     # execute_lukning("111131-1112")
     # fetch_lendings("111131-1112")
+    from utils.config import BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
+    from kp.kp_client import KPClient
+
+    from utils.config import KP_USERNAME, KP_PASSWORD
+
+    kp_client = KPClient(KP_USERNAME, KP_PASSWORD)
+    
+    kp_client.fetch_token()
+    print(kp_client.get_person("111131-1112"))
