@@ -138,8 +138,32 @@ class KPAPIClient(BaseAPIClient):
     def _make_request(self, method, path, **kwargs):
         # Override _make_request to handle specific behavior for KPAPIClient
         try:
-            response = super()._make_request(method, path, **kwargs)
-            print(response)
+            # response = super()._make_request(method, path, **kwargs)
+            headers = self.get_auth_headers()
+
+            if path.startswith("http://") or path.startswith("https://"):
+                url = path
+            else:
+                url = f"{self.base_url}/{path}"
+
+            try:
+                response = method(url, headers=headers, **kwargs)
+                response.raise_for_status()
+
+                try:
+                    response = response.json()
+                    if isinstance(response, list):
+                        response = {"results": response}
+
+                except json.JSONDecodeError:
+                    if not response.content:
+                        response = 'success'
+                    response = response.content
+
+            except requests.exceptions.RequestException as e:
+                logger.error(e)
+                return None
+            
             headers = response.get('Headers', {})
             if headers:
                 content_type = headers.get('Content-Type', '')

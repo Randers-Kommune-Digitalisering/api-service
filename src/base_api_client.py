@@ -28,11 +28,7 @@ class BaseAPIClient(ABC):
             response.raise_for_status()
 
             try:
-                response_data = response.json()
-                # TODO: This breaks Nexus! Remove please
-                if isinstance(response_data, list):
-                    return {"results": response_data}
-                return response_data
+                return response.json()
 
             except json.JSONDecodeError:
                 if not response.content:
