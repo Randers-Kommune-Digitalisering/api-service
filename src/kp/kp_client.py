@@ -163,7 +163,7 @@ class KPAPIClient(BaseAPIClient):
             except requests.exceptions.RequestException as e:
                 logger.error(e)
                 return None
-            
+
             headers = response.get('Headers', {})
             if headers:
                 content_type = headers.get('Content-Type', '')
