@@ -29,6 +29,7 @@ class BaseAPIClient(ABC):
 
             try:
                 response_data = response.json()
+                # TODO: This breaks Nexus! Remove please
                 if isinstance(response_data, list):
                     return {"results": response_data}
                 return response_data
