@@ -12,17 +12,19 @@ delta_client = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_P
 def job():
     try:
         active_org_list = _fetch_all_active_organisations()
+        all_delta_orgs = delta_client.get_all_organizations()
         employees_changed_list = delta_client.get_employees_changed()
         for index, employee in enumerate(employees_changed_list):
             logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
-            execute_brugerauth(active_org_list, employee['user'], employee['organizations'])
+            execute_brugerauth(active_org_list, employee['user'], employee['organizations'], all_delta_orgs)
         return True
     except Exception as e:
         logger.error(f"Error in job: {e}")
         return False
 
 
-def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list):
+def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list, all_organisation_uuid_list: list = None):
+    print(all_organisation_uuid_list)
     professional = _fetch_professional(primary_identifier)
 
     if not professional:
@@ -45,22 +47,30 @@ def execute_brugerauth(active_org_list: list, primary_identifier: str, input_org
     # logger.info(f"Professional current organisation: {professional_org_list}")
 
     # uuids from active_org_list not found in input_organisation_uuid_list
-    unassigned_organisation_ids = [item['id'] for item in active_org_list if item['sync_id'] in input_organisation_uuid_list]
+    organisation_ids_to_assign = [item['id'] for item in active_org_list if item['sync_id'] in input_organisation_uuid_list]
 
-    if len(unassigned_organisation_ids) == 0:
+    if len(organisation_ids_to_assign) == 0:
+        # TODO: Reomve ? or return None?
         logger.error(f"No organizations found for professional {primary_identifier}")
 
     # Filter out IDs present in professional_org_list
-    unassigned_organisation_ids = [org_id for org_id in unassigned_organisation_ids if org_id not in [item['id'] for item in professional_org_list]]
+    unassigned_organisation_ids_to_assign = [org_id for org_id in organisation_ids_to_assign if org_id not in [item['id'] for item in professional_org_list]]
 
     # Remove duplicates
-    unassigned_organisation_ids = list(set(unassigned_organisation_ids))
-    # logger.info(f"Professional unassigned organisation: {unassigned_organisation_ids}")
+    unassigned_organisation_ids_to_assign = list(set(unassigned_organisation_ids_to_assign))
+
+    # Get a list of all delta uuid which are not set for the user and get corosponding nexus ids
+    uuids_to_remove = list(set(all_organisation_uuid_list) - set(input_organisation_uuid_list))
+    organisation_ids_to_remove = [item['id'] for item in active_org_list if item['sync_id'] in uuids_to_remove]
+
+    # Filter out IDs not present in professional_org_list and remove duplicates
+    assigned_organisation_ids_to_remove = [org_id for org_id in organisation_ids_to_remove if org_id in [item['id'] for item in professional_org_list]]
+    assigned_organisation_ids_to_remove = list(set(assigned_organisation_ids_to_remove))
 
     try:
-        if len(unassigned_organisation_ids) > 0:
+        if len(unassigned_organisation_ids_to_assign) > 0:
             # Update the organisations for the professional
-            if _update_professional_organisations(professional, unassigned_organisation_ids):
+            if _update_professional_organisations(professional, unassigned_organisation_ids_to_assign, assigned_organisation_ids_to_remove):
                 logger.info(f'Professional {primary_identifier} updated with organisations')
             else:
                 logger.error(f'Failed to update professional {primary_identifier} with organisations')
@@ -105,14 +115,14 @@ def _fetch_external_professional(primary_identifier):
         return res
 
 
-def _update_professional_organisations(professional, organisation_id_list):
+def _update_professional_organisations(professional, organisation_ids_to_add, organisation_ids_to_remove):
     # Proffesional self
     request1 = NexusRequest(input_response=professional, link_href="self", method="GET")
 
     # json body with the list of organisation ids that should be added to the professional
     json_body = {
-        "added": organisation_id_list,
-        "removed": []
+        "added": organisation_ids_to_add,
+        "removed": organisation_ids_to_remove
     }
 
     # Proffesional organisations
@@ -213,6 +223,9 @@ def _collect_syncIds_and_ids_from_org(org: object):
 
 
 def _add_supplier_ids(organisation_ids: list, suppliers: list):
+    for sup in suppliers:
+        if type(sup) is str:
+            print(sup)
     for org in organisation_ids:
         supplier = next((item for item in suppliers if item.get('organizationId') == org['id']), None)
         org['supplier'] = supplier

@@ -3,7 +3,7 @@ import time
 import requests
 from typing import Dict, Tuple, List, Optional
 from base_api_client import BaseAPIClient
-from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET
+from utils.config import NEXUS_URL, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_TOKEN_ROUTE
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class NexusAPIClient(BaseAPIClient):
         return client
 
     def request_access_token(self):
-        token_url = f"{self.base_url}/authx/realms/randers/protocol/openid-connect/token"
+        token_url = f"{self.base_url}/{NEXUS_TOKEN_ROUTE}"
         payload = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,
@@ -54,7 +54,7 @@ class NexusAPIClient(BaseAPIClient):
             return None
 
     def refresh_access_token(self):
-        token_url = f"{self.base_url}/authx/realms/randers/protocol/openid-connect/token"
+        token_url = f"{self.base_url}/{NEXUS_TOKEN_ROUTE}"
         payload = {
             "grant_type": "refresh_token",
             "client_id": self.client_id,
