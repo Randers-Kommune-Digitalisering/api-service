@@ -1,6 +1,5 @@
 import logging
 import requests
-import json
 from typing import Dict, Tuple
 
 from requests.auth import HTTPBasicAuth
@@ -110,8 +109,11 @@ class KPAPIClient(BaseAPIClient):
         response = requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID,
                                                                                      password=BROWSERLESS_CLIENT_SECRET))
         # Parse the JSON response
-        # TODO: Handle errors - what if response.content is not JSON? - and a better way to read JSON is to use the response class' json method: response.json()
-        data = json.loads(response.content)
+        try:
+            data = response.json()
+        except requests.exceptions.JSONDecodeError:
+            logger.error("Failed to parse JSON response from Browserless.")
+            return None
 
         # Initialize session_cookie
         session_cookie = None
@@ -154,7 +156,7 @@ class KPAPIClient(BaseAPIClient):
                     if isinstance(response, list):
                         response = {"results": response}
 
-                except json.JSONDecodeError:
+                except requests.exceptions.JSONDecodeError:
                     if not response.content:
                         response = 'success'
                     response = response.content
