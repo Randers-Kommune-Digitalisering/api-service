@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 
 from requests.auth import HTTPBasicAuth
 from base_api_client import BaseAPIClient
-from utils.config import KP_URL, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
+from utils.config import KP_URL, BROWSERLESS_URL, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,7 @@ class KPAPIClient(BaseAPIClient):
 
     def request_session_token(self):
         login_url = self.base_url
-        # TODO: URL should be in config - preferably as a env var - maybe just add /function to the base URL here ?
-        url = "https://browserless.prototypes.randers.dk/function"
+        url = f"{BROWSERLESS_URL}/function"
         headers = {
             "Content-Type": "application/javascript",
 
