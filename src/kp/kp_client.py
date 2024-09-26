@@ -197,7 +197,6 @@ class KPAPIClient(BaseAPIClient):
 
 
 class KPClient:
-    # TODO: add error handling for incorrect credentials - maybe add more general error handling as well ?
     def __init__(self, username, password):
         self.api_client = KPAPIClient.get_client(username, password)
 
