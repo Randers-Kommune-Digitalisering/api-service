@@ -9,45 +9,116 @@ nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL)
 delta_client = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_PASS, base_url=DELTA_BASE_URL, top_adm_org_uuid=DELTA_TOP_ADM_UNIT_UUID)
 
 
+# ### TEST STUFFF  START ### #
+
+# import json
+# get_adm_org_list = delta_client.get_adm_org_list()
+# with open('adm_org_list.json', 'w') as f:
+#     json.dump(get_adm_org_list, f)
+
+with open('adm_org_list.json', 'r') as f:
+    import json
+    import datetime
+    data = json.load(f)
+    delta_client.adm_org_list = data
+    delta_client.last_adm_org_list_updated = datetime.datetime.now()
+
+
+def test():
+    ##############################
+    id = '9c4bdf85-3af6-4e43-adc5-ee6a5f14a94f'
+    admunit = 'f41628ce-0c2b-4ba9-9b3a-e1d212fe3d3b'
+    ##############################
+
+    active_org_list = _fetch_all_active_organisations()
+    all_delta_orgs = delta_client.get_all_organizations()
+    employee_list = []
+
+    payload_employee = delta_client._get_payload('employee_dq_number')
+    payload_employee_with_params = delta_client._set_params(payload_employee, {'uuid': id})
+    r = delta_client._make_post_request(payload_employee_with_params)
+    r.raise_for_status()
+    json_res = r.json()
+    if len(json_res['queryResults'][0]['instances']) > 0:
+        first_res = json_res['queryResults'][0]['instances'][0]
+        # Check employee is active
+        if first_res['state'] == 'STATE_ACTIVE' and len(first_res['typeRefs']) > 0:
+            for relation in first_res['typeRefs']:
+                if relation['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
+                    # Check if relation to admin unit is correct
+                    if relation['refObjIdentity']['uuid'] == admunit:
+                        if len(first_res["inTypeRefs"]) > 0:
+                            for ref in first_res["inTypeRefs"]:
+                                if ref['refObjTypeUserKey'] == 'APOS-Types-User':
+                                    # Add employee to dictionary with key DQ number and value admin unit UUID
+                                    employee_list.append(({'user': ref['refObjIdentity']['userKey'], 'organizations': [admunit] + delta_client.adm_org_list[admunit]}))
+
+    execute_brugerauth(active_org_list, employee_list[0]['user'], employee_list[0]['organizations'], all_delta_orgs)
+# ### TEST STUFFF END ### #
+
+
 def job():
     try:
         active_org_list = _fetch_all_active_organisations()
+        all_delta_orgs = delta_client.get_all_organizations()
         employees_changed_list = delta_client.get_employees_changed()
         for index, employee in enumerate(employees_changed_list):
             logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
-            execute_brugerauth(active_org_list, employee['user'], employee['organizations'])
+            execute_brugerauth(active_org_list, employee['user'], employee['organizations'], all_delta_orgs)
         return True
     except Exception as e:
         logger.error(f"Error in job: {e}")
         return False
 
 
-def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list):
+def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list, all_organisation_uuid_list: list = None):
+    print(all_organisation_uuid_list)
     professional = _fetch_professional(primary_identifier)
     if not professional:
         logger.error(f"Professional {primary_identifier} not found")
+        # logger.info(f"Professional {primary_identifier} not found in Nexus - creating")
+        # # TODO: Add filtering for which professionals to create
+        # new_professional = _fetch_external_professional(primary_identifier)
+        # if new_professional:
+        #     professional = nexus_client.post_request(professional['_links']['create']['href'], json=professional)
+        #     if professional:
+        #         logger.info(f"Professional {primary_identifier} created")
+        #     else:
+        #         logger.error(f"Failed to create professional {primary_identifier} - skipping")
+        #         return
+        # else:
+        #     logger.error(f"Professional {primary_identifier} not found in external system - skipping")
+        #     return
 
     # Get all assigned organisations for professional as list of dicts - [0] being id, [1] being uuid
     professional_org_list = _fetch_professional_org_syncIds(professional)
     # logger.info(f"Professional current organisation: {professional_org_list}")
 
     # uuids from active_org_list not found in input_organisation_uuid_list
-    unassigned_organisation_ids = [item['id'] for item in active_org_list if item['sync_id'] in input_organisation_uuid_list]
+    organisation_ids_to_assign = [item['id'] for item in active_org_list if item['sync_id'] in input_organisation_uuid_list]
 
-    if len(unassigned_organisation_ids) == 0:
+    if len(organisation_ids_to_assign) == 0:
+        # TODO: Reomve ? or return None?
         logger.error(f"No organizations found for professional {primary_identifier}")
 
     # Filter out IDs present in professional_org_list
-    unassigned_organisation_ids = [org_id for org_id in unassigned_organisation_ids if org_id not in [item['id'] for item in professional_org_list]]
+    unassigned_organisation_ids_to_assign = [org_id for org_id in organisation_ids_to_assign if org_id not in [item['id'] for item in professional_org_list]]
 
     # Remove duplicates
-    unassigned_organisation_ids = list(set(unassigned_organisation_ids))
-    # logger.info(f"Professional unassigned organisation: {unassigned_organisation_ids}")
+    unassigned_organisation_ids_to_assign = list(set(unassigned_organisation_ids_to_assign))
+
+    # Get a list of all delta uuid which are not set for the user and get corosponding nexus ids
+    uuids_to_remove = list(set(all_organisation_uuid_list) - set(input_organisation_uuid_list))
+    organisation_ids_to_remove = [item['id'] for item in active_org_list if item['sync_id'] in uuids_to_remove]
+
+    # Filter out IDs not present in professional_org_list and remove duplicates
+    assigned_organisation_ids_to_remove = [org_id for org_id in organisation_ids_to_remove if org_id in [item['id'] for item in professional_org_list]]
+    assigned_organisation_ids_to_remove = list(set(assigned_organisation_ids_to_remove))
 
     try:
-        if len(unassigned_organisation_ids) > 0:
+        if len(unassigned_organisation_ids_to_assign) > 0:
             # Update the organisations for the professional
-            if _update_professional_organisations(professional, unassigned_organisation_ids):
+            if _update_professional_organisations(professional, unassigned_organisation_ids_to_assign, assigned_organisation_ids_to_remove):
                 logger.info(f'Professional {primary_identifier} updated with organisations')
             else:
                 logger.error(f'Failed to update professional {primary_identifier} with organisations')
@@ -78,14 +149,14 @@ def _fetch_professional(primary_identifier):
         return nexus_client.find_professional_by_query(primary_identifier)[0]
 
 
-def _update_professional_organisations(professional, organisation_id_list):
+def _update_professional_organisations(professional, organisation_ids_to_add, organisation_ids_to_remove):
     # Proffesional self
     request1 = NexusRequest(input_response=professional, link_href="self", method="GET")
 
     # json body with the list of organisation ids that should be added to the professional
     json_body = {
-        "added": organisation_id_list,
-        "removed": []
+        "added": organisation_ids_to_add,
+        "removed": organisation_ids_to_remove
     }
 
     # Proffesional organisations
@@ -186,6 +257,9 @@ def _collect_syncIds_and_ids_from_org(org: object):
 
 
 def _add_supplier_ids(organisation_ids: list, suppliers: list):
+    for sup in suppliers:
+        if type(sup) is str:
+            print(sup)
     for org in organisation_ids:
         supplier = next((item for item in suppliers if item.get('organizationId') == org['id']), None)
         org['supplier'] = supplier

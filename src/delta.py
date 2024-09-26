@@ -151,7 +151,7 @@ class DeltaClient:
         thread.start()
 
     # returns a dictionaries with the admin organization unit UUID as the key and a list of sub admin organization unit UUIDs as the value
-    def get_adm_org_lists(self):
+    def get_adm_org_list(self):
         if not self.adm_org_list:
             logger.info('Foreground update')
             self._update_job()
@@ -164,10 +164,14 @@ class DeltaClient:
                 self._update_adm_org_list_background()
         return self.adm_org_list
 
+    # Returns all ids in the adm org list dict as a list
+    def get_all_organizations(self):
+        return [item for key, values in self.get_adm_org_list().items() for item in [key] + values]
+
     # Returns a list of dictionaries with key 'user' containing DQ-numberand key 'organizations' containing a list of UUIDs for organizations they need access to
     def get_employees_changed(self, time_back_minutes=30):
         try:
-            adm_org_units_with_employees = self.get_adm_org_lists()
+            adm_org_units_with_employees = self.get_adm_org_list()
             if not adm_org_units_with_employees:
                 raise Exception('Error getting adm. org. units with employees.')
 
