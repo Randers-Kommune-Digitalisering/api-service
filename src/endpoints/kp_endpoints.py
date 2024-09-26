@@ -28,7 +28,7 @@ def search_person():
 
         response = kp_client.search_person(cpr)
         if response is None:
-            return jsonify({"error": "No response"}), 400
+            return jsonify({"cpr": cpr, "error": "No response"}), 400
 
         return jsonify(response)
 
@@ -78,17 +78,23 @@ def get_person():
         # Get personal supplement
         personal_supplement = kp_client.get_personal_supplement(id)
         if personal_supplement:
-            response['personligTillaegsprocent'] = personal_supplement.get('results')
+            response['personligTillaegsprocent'] = personal_supplement
+        else:
+            logger.warning(f"Could not find personal supplement for id: {id}")
 
         # Get health supplement
         health_supplement = kp_client.get_health_supplement(id)
         if health_supplement:
-            response['helbredstillaegsprocent'] = health_supplement.get('results')
+            response['helbredstillaegsprocent'] = health_supplement
+        else:
+            logger.warning(f"Could not find health supplement for id: {id}")
 
         # Get special information
         special_information = kp_client.get_special_information(id)
         if special_information:
-            response['saerligeOplysninger'] = special_information.get('results')
+            response['saerligeOplysninger'] = special_information
+        else:
+            logger.warning(f"Could not find special information for id: {id}")
 
         response['id'] = id
         return jsonify(response)
