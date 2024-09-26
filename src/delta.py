@@ -11,6 +11,40 @@ from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
+# Harded coded list of employment types to import TODO: FIX THIS!
+employments_to_import = [
+    "Assistent HK (RG_3014)",
+    "Bachelor (RG_3111)",
+    "Beskæft.vejl. (RG_7313)",
+    "Ergoterapeut (RG_7031)",
+    "Fysioterapeut (RG_7032)",
+    "Hjemmehjælper (RG_7312)",
+    "Kandidatudd. (RG_7014)",
+    "Klin.Diætist (RG_7017)",
+    "Leder N3 FOA (RG_7204)",
+    "Leder N4 SHK (RG_7102)",
+    "Leder N5 F/E (RG_7124)",
+    "Musikterapeut (RG_3167)",
+    "Plejehjemsass. (RG_7308)",
+    "Plejemedhjælp. (RG_7309)",
+    "Plejer",
+    "Prof.bachelor (RG_7010)",
+    "Psyk.Terapeut (RG_7013)",
+    "Psykolog (RG_3144)",
+    "Pæd.særl.stil (RG_6933)",
+    "Sosu-assistent (RG_7307)",
+    "Sosu-assistentelev",
+    "Sosu-hj.elev (RG_7304)",
+    "Sosu-hjælper (RG_7306)",
+    "Sosu-hjælper (RG_7306)",
+    "Specialist HK (RG_3017)",
+    "Sundhedsmedhj. (RG_7315)",
+    "Sygehjælper (RG_7303)",
+    "Sygeplejerske (RG_7002)",
+    "Uudd Sosu (RG_7316)",
+    "Sygeplejestuderende"
+]
+
 
 class DeltaClient:
     def __init__(self, cert_base64, cert_pass, base_url, top_adm_org_uuid, relative_assets_path='assets/delta/'):
@@ -218,6 +252,8 @@ class DeltaClient:
             if len(employee_list) > 0:
                 payload_employee = self._get_payload('employee_dq_number')
                 for employee in employee_list:
+                    dq_number = None
+                    employment_type = None
                     payload_employee_with_params = self._set_params(payload_employee, {'uuid': employee['employee']})
                     r = self._make_post_request(payload_employee_with_params)
                     r.raise_for_status()
@@ -233,8 +269,13 @@ class DeltaClient:
                                         if len(first_res["inTypeRefs"]) > 0:
                                             for ref in first_res["inTypeRefs"]:
                                                 if ref['refObjTypeUserKey'] == 'APOS-Types-User':
-                                                    # Add employee to dictionary with key DQ number and value admin unit UUID
-                                                    employee_changed_list.append({'user': ref['refObjIdentity']['userKey'], 'organizations': [employee['admunit']] + adm_org_units_with_employees[employee['admunit']]})
+                                                    dq_number = ref['refObjIdentity']['userKey']
+                                elif relation['userKey'] == 'APOS-Types-Engagement-TypeRelation-Position':
+                                    employment_type = relation['refObjIdentity']['userKey']
+
+                    if dq_number and employment_type in employments_to_import:
+                        # Add employee to dictionary with key DQ number and value admin unit UUID
+                        employee_changed_list.append({'user': dq_number, 'organizations': [employee['admunit']] + adm_org_units_with_employees[employee['admunit']]})
 
             logger.info(f'Employees with changes {len(employee_changed_list)}')
             logger.info(f'Got employee changes in {str(timedelta(seconds=(time.time() - start)))}')
