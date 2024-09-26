@@ -15,7 +15,7 @@ def fetch_kp_token():
     return jsonify(kp_client.fetch_token())
 
 
-@api_kp_bp.route('/search/person', methods=['POST'])
+@api_kp_bp.route('/search/person', methods=['POST'])  # TODO: Could this not be changed to a GET with params? - maybe name changed to : /person/search
 def search_person():
     try:
         data = request.get_json()
@@ -36,7 +36,7 @@ def search_person():
         return jsonify({"error": f"{e}"}), 500
 
 
-@api_kp_bp.route('/get/person', methods=['POST'])
+@api_kp_bp.route('/get/person', methods=['POST'])  # TODO: Could this not be changed to a GET with params? - maybe name changed to : /person  NB: Bad practice to have "get" in the path name
 def get_person():
     try:
         data = request.get_json()

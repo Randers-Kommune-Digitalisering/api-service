@@ -1,11 +1,10 @@
 import logging
 import requests
-import json
 from typing import Dict, Tuple
 
 from requests.auth import HTTPBasicAuth
 from base_api_client import BaseAPIClient
-from utils.config import KP_URL, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
+from utils.config import KP_URL, BROWSERLESS_URL, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +30,7 @@ class KPAPIClient(BaseAPIClient):
 
     def request_session_token(self):
         login_url = self.base_url
-        # TODO: URL should be in config - preferably as a env var - maybe just add /function to the base URL here ?
-        url = "https://browserless.prototypes.randers.dk/function"
+        url = f"{BROWSERLESS_URL}/function"
         headers = {
             "Content-Type": "application/javascript",
 
@@ -111,8 +109,11 @@ class KPAPIClient(BaseAPIClient):
         response = requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID,
                                                                                      password=BROWSERLESS_CLIENT_SECRET))
         # Parse the JSON response
-        # TODO: Handle errors - what if response.content is not JSON? - and a better way to read JSON is to use the response class' json method: response.json()
-        data = json.loads(response.content)
+        try:
+            data = response.json()
+        except requests.exceptions.JSONDecodeError:
+            logger.error("Failed to parse JSON response from Browserless.")
+            return None
 
         # Initialize session_cookie
         session_cookie = None
