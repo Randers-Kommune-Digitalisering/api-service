@@ -165,7 +165,7 @@ class KPAPIClient(BaseAPIClient):
                 try:
                     return response.json()
 
-                except json.JSONDecodeError:
+                except requests.exceptions.JSONDecodeError:
                     if not response.content:
                         return ' '
                     return response.content
