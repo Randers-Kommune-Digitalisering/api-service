@@ -29,8 +29,8 @@ class BaseAPIClient(ABC):
 
             try:
                 response_data = response.json()
-                if isinstance(response_data, list):
-                    return {"results": response_data}
+                # if isinstance(response_data, list):
+                #     return {"results": response_data}
                 return response_data
 
             except json.JSONDecodeError:
