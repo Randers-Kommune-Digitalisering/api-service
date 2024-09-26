@@ -28,7 +28,7 @@ def search_person():
 
         response = kp_client.search_person(cpr)
         if response is None:
-            return jsonify({"error": "No response"}), 400
+            return jsonify({"cpr": cpr, "error": "No response"}), 400
 
         return jsonify(response)
 
