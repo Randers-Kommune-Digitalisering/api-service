@@ -32,7 +32,7 @@ class BaseAPIClient(ABC):
 
             except json.JSONDecodeError:
                 if not response.content:
-                    return 'success'
+                    return ' '
                 return response.content
 
         except requests.exceptions.RequestException as e:

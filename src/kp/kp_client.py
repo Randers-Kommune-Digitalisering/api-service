@@ -138,7 +138,6 @@ class KPAPIClient(BaseAPIClient):
     def _make_request(self, method, path, **kwargs):
         # Override _make_request to handle specific behavior for KPAPIClient
         try:
-            # response = super()._make_request(method, path, **kwargs)
             headers = self.get_auth_headers()
 
             if path.startswith("http://") or path.startswith("https://"):
@@ -150,47 +149,39 @@ class KPAPIClient(BaseAPIClient):
                 response = method(url, headers=headers, **kwargs)
                 response.raise_for_status()
 
-                try:
-                    response = response.json()
-                    if isinstance(response, list):
-                        response = {"results": response}
-
-                except json.JSONDecodeError:
-                    if not response.content:
-                        response = 'success'
-                    response = response.content
-
-            except requests.exceptions.RequestException as e:
-                logger.error(e)
-                return None
-
-            headers = response.get('Headers', {})
-            if headers:
-                content_type = headers.get('Content-Type', '')
-
-                if 'text/html' in content_type.lower():
+                if 'text/html' in response.headers.get('Content-Type', '').lower():
                     if not self.auth_attempted:
                         logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
-                        self.authenticate()  # Attempt to fetch new session token
-                        headers = self.get_headers()  # Update headers with new session token
+                        self.request_session_token()  # Attempt to fetch new session token
                         self.auth_attempted = True
-                        return method(path, headers=headers, **kwargs)  # Retry the request
+                        return self._make_request(method, path, **kwargs)  # Retry the request
 
                     if self.auth_attempted:
                         self.auth_attempted = False
                         logger.warning("Fetching new session token failed")
-            return response
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 401 and self.auth_attempted is False:
-                logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
-                self.authenticate()  # Attempt to fetch new session token
-                headers = self.get_auth_headers()  # Update headers with new session token
-                self.auth_attempted = True
-                return method(path, headers=headers, **kwargs)  # Retry the request
-            elif e.response.status_code == 401 and self.auth_attempted is True:
-                self.auth_attempted = False
-                logger.warning("Fetching new session token failed")
-                return None
+                        return None
+
+                try:
+                    return response.json()
+
+                except json.JSONDecodeError:
+                    if not response.content:
+                        return ' '
+                    return response.content
+            except requests.exceptions.HTTPError as e:
+                if (e.response.status_code == 401 and self.auth_attempted is False) or (e.response.status_code == 500 and b'AccessDeniedException' in e.response.content and self.auth_attempted is False):
+                    logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
+                    self.request_session_token()  # Attempt to fetch new session token
+                    self.auth_attempted = True
+                    return self._make_request(method, path, **kwargs)  # Retry the request
+                elif (e.response.status_code == 401 and self.auth_attempted is True) or (e.response.status_code == 500 and b'AccessDeniedException' in e.response.content and self.auth_attempted is True):
+                    self.auth_attempted = False
+                    logger.warning("Fetching new session token failed")
+                    return None
+
+        except Exception as e:
+            logger.error(e)
+            return None
 
 
 class KPClient:
