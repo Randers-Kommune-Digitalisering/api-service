@@ -24,7 +24,6 @@ def job():
 
 
 def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list, all_organisation_uuid_list: list = None):
-    print(all_organisation_uuid_list)
     professional = _fetch_professional(primary_identifier)
 
     if not professional:
@@ -223,9 +222,6 @@ def _collect_syncIds_and_ids_from_org(org: object):
 
 
 def _add_supplier_ids(organisation_ids: list, suppliers: list):
-    for sup in suppliers:
-        if type(sup) is str:
-            print(sup)
     for org in organisation_ids:
         supplier = next((item for item in suppliers if item.get('organizationId') == org['id']), None)
         org['supplier'] = supplier

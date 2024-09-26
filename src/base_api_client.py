@@ -44,8 +44,8 @@ class BaseAPIClient(ABC):
             #    logger.error(response.content)
             return None
 
-    def get(self, path, **kwargs):
-        return self._make_request(requests.get, path, **kwargs)
+    def get(self, path, params=None, **kwargs):
+        return self._make_request(requests.get, path, params=params, **kwargs)
 
     def post(self, path, data=None, json=None, **kwargs):
         return self._make_request(requests.post, path, data=data, json=json, **kwargs)
