@@ -30,6 +30,3 @@ app = create_app()
 
 if __name__ == "__main__":  # pragma: no cover
     app.run(debug=DEBUG, host='0.0.0.0', port=PORT)
-
-    # from jobs.nexus_flow_brugerauth import test
-    # test()

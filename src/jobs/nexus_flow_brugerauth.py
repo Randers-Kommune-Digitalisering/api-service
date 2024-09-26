@@ -9,54 +9,6 @@ nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL)
 delta_client = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_PASS, base_url=DELTA_BASE_URL, top_adm_org_uuid=DELTA_TOP_ADM_UNIT_UUID)
 
 
-# ### TEST STUFFF  START ### #
-
-# import json
-# get_adm_org_list = delta_client.get_adm_org_list()
-# with open('adm_org_list.json', 'w') as f:
-#     json.dump(get_adm_org_list, f)
-
-with open('adm_org_list.json', 'r') as f:
-    import json
-    import datetime
-    data = json.load(f)
-    delta_client.adm_org_list = data
-    delta_client.last_adm_org_list_updated = datetime.datetime.now()
-
-
-def test():
-    ##############################
-    id = '9c4bdf85-3af6-4e43-adc5-ee6a5f14a94f'
-    admunit = 'f41628ce-0c2b-4ba9-9b3a-e1d212fe3d3b'
-    ##############################
-
-    active_org_list = _fetch_all_active_organisations()
-    all_delta_orgs = delta_client.get_all_organizations()
-    employee_list = []
-
-    payload_employee = delta_client._get_payload('employee_dq_number')
-    payload_employee_with_params = delta_client._set_params(payload_employee, {'uuid': id})
-    r = delta_client._make_post_request(payload_employee_with_params)
-    r.raise_for_status()
-    json_res = r.json()
-    if len(json_res['queryResults'][0]['instances']) > 0:
-        first_res = json_res['queryResults'][0]['instances'][0]
-        # Check employee is active
-        if first_res['state'] == 'STATE_ACTIVE' and len(first_res['typeRefs']) > 0:
-            for relation in first_res['typeRefs']:
-                if relation['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
-                    # Check if relation to admin unit is correct
-                    if relation['refObjIdentity']['uuid'] == admunit:
-                        if len(first_res["inTypeRefs"]) > 0:
-                            for ref in first_res["inTypeRefs"]:
-                                if ref['refObjTypeUserKey'] == 'APOS-Types-User':
-                                    # Add employee to dictionary with key DQ number and value admin unit UUID
-                                    employee_list.append(({'user': ref['refObjIdentity']['userKey'], 'organizations': [admunit] + delta_client.adm_org_list[admunit]}))
-
-    execute_brugerauth(active_org_list, employee_list[0]['user'], employee_list[0]['organizations'], all_delta_orgs)
-# ### TEST STUFFF END ### #
-
-
 def job():
     try:
         active_org_list = _fetch_all_active_organisations()
@@ -76,19 +28,6 @@ def execute_brugerauth(active_org_list: list, primary_identifier: str, input_org
     professional = _fetch_professional(primary_identifier)
     if not professional:
         logger.error(f"Professional {primary_identifier} not found")
-        # logger.info(f"Professional {primary_identifier} not found in Nexus - creating")
-        # # TODO: Add filtering for which professionals to create
-        # new_professional = _fetch_external_professional(primary_identifier)
-        # if new_professional:
-        #     professional = nexus_client.post_request(professional['_links']['create']['href'], json=professional)
-        #     if professional:
-        #         logger.info(f"Professional {primary_identifier} created")
-        #     else:
-        #         logger.error(f"Failed to create professional {primary_identifier} - skipping")
-        #         return
-        # else:
-        #     logger.error(f"Professional {primary_identifier} not found in external system - skipping")
-        #     return
 
     # Get all assigned organisations for professional as list of dicts - [0] being id, [1] being uuid
     professional_org_list = _fetch_professional_org_syncIds(professional)
