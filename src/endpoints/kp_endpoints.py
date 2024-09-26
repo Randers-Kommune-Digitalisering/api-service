@@ -36,7 +36,7 @@ def search_person():
         return jsonify({"error": f"{e}"}), 500
 
 
-@api_kp_bp.route('/get/person', methods=['POST'])  # TODO: Could this not be changed to a GET with params? - maybe name changed to : /person  NB: Bad practice to have "get" in the path name
+@api_kp_bp.route('/person', methods=['POST'])
 def get_person():
     try:
         data = request.get_json()
