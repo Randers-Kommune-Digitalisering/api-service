@@ -123,13 +123,25 @@ class KPAPIClient(BaseAPIClient):
             if cookie['name'] == 'JSESSIONID':
                 session_cookie = cookie['value']
                 break
+
         self.session_cookie = session_cookie
-        return session_cookie
+        return self.session_cookie
 
     def authenticate(self):
         if self.session_cookie:
             return self.session_cookie
         return self.request_session_token()
+
+    def reauthenticate(self):
+        if not self.auth_attempted:
+            self.auth_attempted = True
+            auth = self.request_session_token()
+            if auth:
+                return auth
+        else:
+            self.auth_attempted = False
+            logger.error("Fetching new session token failed.")
+        return False
 
     def get_auth_headers(self):
         session_cookie = self.authenticate()
@@ -150,34 +162,33 @@ class KPAPIClient(BaseAPIClient):
                 response = method(url, headers=headers, **kwargs)
                 response.raise_for_status()
 
-                if 'text/html' in response.headers.get('Content-Type', '').lower():
-                    if not self.auth_attempted:
-                        logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
-                        self.request_session_token()  # Attempt to fetch new session token
-                        self.auth_attempted = True
+                if 'text/html' in response.headers.get('Content-Type', '').lower():  # Check if response is HTML
+                    retry_authenticate = self.reauthenticate()  # Attempt to fetch new session token
+                    if retry_authenticate:
                         return self._make_request(method, path, **kwargs)  # Retry the request
-
-                    if self.auth_attempted:
-                        self.auth_attempted = False
-                        logger.warning("Fetching new session token failed")
+                    else:
                         return None
 
                 try:
-                    return response.json()
+                    json = response.json()
+                    self.auth_attempted = False
+                    return json
 
-                except requests.exceptions.JSONDecodeError:
+                except requests.exceptions.JSONDecodeError:  # Handle JSON decoding errors
+                    self.auth_attempted = False
                     if not response.content:
                         return ' '
                     return response.content
-            except requests.exceptions.HTTPError as e:
-                if (e.response.status_code == 401 and self.auth_attempted is False) or (e.response.status_code == 500 and b'AccessDeniedException' in e.response.content and self.auth_attempted is False):
-                    logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
-                    self.request_session_token()  # Attempt to fetch new session token
-                    self.auth_attempted = True
-                    return self._make_request(method, path, **kwargs)  # Retry the request
-                elif (e.response.status_code == 401 and self.auth_attempted is True) or (e.response.status_code == 500 and b'AccessDeniedException' in e.response.content and self.auth_attempted is True):
-                    self.auth_attempted = False
-                    logger.warning("Fetching new session token failed")
+
+            except requests.exceptions.HTTPError as e:  # Handle HTTP errors
+                if e.response.status_code == 401 or (e.response.status_code == 500 and b'AccessDeniedException' in e.response.content):
+                    retry_authenticate = self.reauthenticate()  # Attempt to fetch new session token
+                    if retry_authenticate:
+                        return self._make_request(method, path, **kwargs)  # Retry the request
+                    else:
+                        return None
+                else:
+                    logger.error(e)
                     return None
 
         except Exception as e:
