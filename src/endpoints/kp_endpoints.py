@@ -14,7 +14,7 @@ api_kp_bp = Blueprint('api_kp', __name__, url_prefix='/api/kp')
 def fetch_kp_token():
     return jsonify(kp_client.fetch_token())
 
-
+# TODO: Could this not be changed to a GET with params? - maybe name changed to : /person/search
 @api_kp_bp.route('/search/person', methods=['POST'])
 def search_person():
     try:
@@ -35,7 +35,7 @@ def search_person():
     except Exception as e:
         return jsonify({"error": f"{e}"}), 500
 
-
+# TODO: Could this not be changed to a GET with params? - maybe name changed to : /person  NB: Bad practice to have "get" in the path name
 @api_kp_bp.route('/get/person', methods=['POST'])
 def get_person():
     try:
