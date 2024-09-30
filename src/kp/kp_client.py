@@ -33,7 +33,7 @@ class KPAPIClient(BaseAPIClient):
     def request_session_token(self):
         self.isFetchingToken = True
         login_url = self.base_url
-        url = f"{BROWSERLESS_URL}/function"
+        url = f"{BROWSERLESS_URL.rstrip('/')}/function"
         headers = {
             "Content-Type": "application/javascript",
 
