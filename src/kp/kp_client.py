@@ -241,15 +241,12 @@ class KPClient:
 
     def get_personal_supplement(self, id: str):
         path = f"rest/api/person/history/{id}/personligTillaegsprocent"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
 
     def get_health_supplement(self, id: str):
         path = f"rest/api/person/history/{id}/helbredstillaegsprocent"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
 
     def get_special_information(self, id: str):
         path = f"rest/api/warning/person/{id}"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
