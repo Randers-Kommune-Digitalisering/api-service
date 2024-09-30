@@ -27,7 +27,7 @@ class BaseAPIClient(ABC):
             response = method(url, headers=headers, **kwargs)
             response.raise_for_status()
 
-            try:
+            try
                 return response.json()
 
             except json.JSONDecodeError:
