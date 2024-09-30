@@ -1,3 +1,4 @@
+import time
 import logging
 import requests
 from typing import Dict, Tuple
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class KPAPIClient(BaseAPIClient):
     _client_cache: Dict[Tuple[str, str], 'KPAPIClient'] = {}
+    isFetchingToken = False
 
     def __init__(self, username, password):
         super().__init__(KP_URL)
@@ -29,6 +31,7 @@ class KPAPIClient(BaseAPIClient):
         return client
 
     def request_session_token(self):
+        self.isFetchingToken = True
         login_url = self.base_url
         url = f"{BROWSERLESS_URL}/function"
         headers = {
@@ -125,14 +128,21 @@ class KPAPIClient(BaseAPIClient):
                 break
 
         self.session_cookie = session_cookie
+        self.isFetchingToken = False
         return self.session_cookie
 
     def authenticate(self):
+        while self.isFetchingToken:
+            time.sleep(1)
         if self.session_cookie:
             return self.session_cookie
         return self.request_session_token()
 
     def reauthenticate(self):
+        if self.isFetchingToken:
+            while self.isFetchingToken:
+                time.sleep(1)
+            return self.session_cookie
         if not self.auth_attempted:
             self.auth_attempted = True
             auth = self.request_session_token()

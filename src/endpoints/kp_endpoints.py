@@ -36,15 +36,11 @@ def search_person():
         return jsonify({"error": f"{e}"}), 500
 
 
-@api_kp_bp.route('/person', methods=['POST'])
+@api_kp_bp.route('/person', methods=['GET'])
 def get_person():
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "id or cpr is required"}), 400
-
-        cpr = data.get('cpr')
-        id = data.get('id')
+        cpr = request.args.get('cpr')
+        id = request.args.get('id')
 
         if not id and not cpr:
             return jsonify({"error": "id or cpr is required"}), 400
