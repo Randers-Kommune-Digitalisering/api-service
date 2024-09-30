@@ -1,4 +1,3 @@
-import json
 import logging
 from abc import ABC, abstractmethod
 import requests
@@ -30,7 +29,7 @@ class BaseAPIClient(ABC):
             try:
                 return response.json()
 
-            except json.JSONDecodeError:
+            except requests.exceptions.JSONDecodeError:
                 if not response.content:
                     return ' '
                 return response.content

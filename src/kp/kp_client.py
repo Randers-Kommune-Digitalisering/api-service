@@ -33,7 +33,7 @@ class KPAPIClient(BaseAPIClient):
     def request_session_token(self):
         self.isFetchingToken = True
         login_url = self.base_url
-        url = f"{BROWSERLESS_URL}/function"
+        url = f"{BROWSERLESS_URL.rstrip('/')}/function"
         headers = {
             "Content-Type": "application/javascript",
 
@@ -241,15 +241,12 @@ class KPClient:
 
     def get_personal_supplement(self, id: str):
         path = f"rest/api/person/history/{id}/personligTillaegsprocent"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
 
     def get_health_supplement(self, id: str):
         path = f"rest/api/person/history/{id}/helbredstillaegsprocent"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
 
     def get_special_information(self, id: str):
         path = f"rest/api/warning/person/{id}"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
