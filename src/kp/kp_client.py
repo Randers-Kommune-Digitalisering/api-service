@@ -109,14 +109,17 @@ class KPAPIClient(BaseAPIClient):
           }
         }
         """
-        response = requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID,
-                                                                                     password=BROWSERLESS_CLIENT_SECRET))
+        try:
+            response = requests.post(url, headers=headers, data=data,
+                                     auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID, password=BROWSERLESS_CLIENT_SECRET), timeout=180)
+        except requests.exceptions.RequestException as e:
+            logger.error("Failed to fetch a response from Browserless: %s", e)
+
         # Parse the JSON response
         try:
             data = response.json()
-        except requests.exceptions.JSONDecodeError:
-            logger.error("Failed to parse JSON response from Browserless.")
-            return None
+        except requests.exceptions.JSONDecodeError as e:
+            logger.error("Failed to parse JSON response from Browserless: %s", e)
 
         # Initialize session_cookie
         session_cookie = None
