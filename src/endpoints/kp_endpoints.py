@@ -15,7 +15,7 @@ def fetch_kp_token():
     return jsonify(kp_client.fetch_token())
 
 
-@api_kp_bp.route('/search/person', methods=['POST'])
+@api_kp_bp.route('/search/person', methods=['POST'])  # TODO: Could this not be changed to a GET with params? - maybe name changed to : /person/search
 def search_person():
     try:
         data = request.get_json()
@@ -28,7 +28,7 @@ def search_person():
 
         response = kp_client.search_person(cpr)
         if response is None:
-            return jsonify({"error": "No response"}), 400
+            return jsonify({"cpr": cpr, "error": "No response"}), 400
 
         return jsonify(response)
 
@@ -36,7 +36,7 @@ def search_person():
         return jsonify({"error": f"{e}"}), 500
 
 
-@api_kp_bp.route('/get/person', methods=['POST'])
+@api_kp_bp.route('/person', methods=['POST'])
 def get_person():
     try:
         data = request.get_json()
@@ -78,17 +78,23 @@ def get_person():
         # Get personal supplement
         personal_supplement = kp_client.get_personal_supplement(id)
         if personal_supplement:
-            response['personligTillaegsprocent'] = personal_supplement.get('results')
+            response['personligTillaegsprocent'] = personal_supplement
+        else:
+            logger.warning(f"Could not find personal supplement for id: {id}")
 
         # Get health supplement
         health_supplement = kp_client.get_health_supplement(id)
         if health_supplement:
-            response['helbredstillaegsprocent'] = health_supplement.get('results')
+            response['helbredstillaegsprocent'] = health_supplement
+        else:
+            logger.warning(f"Could not find health supplement for id: {id}")
 
         # Get special information
         special_information = kp_client.get_special_information(id)
         if special_information:
-            response['saerligeOplysninger'] = special_information.get('results')
+            response['saerligeOplysninger'] = special_information
+        else:
+            logger.warning(f"Could not find special information for id: {id}")
 
         response['id'] = id
         return jsonify(response)
