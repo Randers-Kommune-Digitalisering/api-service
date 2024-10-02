@@ -19,7 +19,7 @@ class KPAPIClient(BaseAPIClient):
         self.password = password
         self.session_cookie = None
         self.auth_attempted = False
-        self.isFetchingToken = False
+        self.is_fetching_token = False
 
     @classmethod
     def get_client(cls, username, password):
@@ -31,7 +31,7 @@ class KPAPIClient(BaseAPIClient):
         return client
 
     def request_session_token(self):
-        self.isFetchingToken = True
+        self.is_fetching_token = True
         try:
             login_url = self.base_url
             url = f"{BROWSERLESS_URL.rstrip('/')}/function"
@@ -132,17 +132,17 @@ class KPAPIClient(BaseAPIClient):
                     break
 
             self.session_cookie = session_cookie
-            self.isFetchingToken = False
+            self.is_fetching_token = False
             return self.session_cookie
 
         except Exception as e:
             logger.error(e)
-            self.isFetchingToken = False
+            self.is_fetching_token = False
             return None
 
     def authenticate(self):
         timeout = time.time() + 180   # 3 minutes timeout
-        while self.isFetchingToken:
+        while self.is_fetching_token:
             if time.time() > timeout:
                 break
             time.sleep(1)
@@ -151,9 +151,9 @@ class KPAPIClient(BaseAPIClient):
         return self.request_session_token()
 
     def reauthenticate(self):
-        if self.isFetchingToken:
+        if self.is_fetching_token:
             timeout = time.time() + 180   # 3 minutes timeout
-            while self.isFetchingToken:
+            while self.is_fetching_token:
                 if time.time() > timeout:
                     break
                 time.sleep(1)
