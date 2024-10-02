@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 class KPAPIClient(BaseAPIClient):
     _client_cache: Dict[Tuple[str, str], 'KPAPIClient'] = {}
-    isFetchingToken = False
 
     def __init__(self, username, password):
         super().__init__(KP_URL)
@@ -20,6 +19,7 @@ class KPAPIClient(BaseAPIClient):
         self.password = password
         self.session_cookie = None
         self.auth_attempted = False
+        self.isFetchingToken = False
 
     @classmethod
     def get_client(cls, username, password):
