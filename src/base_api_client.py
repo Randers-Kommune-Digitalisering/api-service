@@ -1,4 +1,3 @@
-import json
 import logging
 from abc import ABC, abstractmethod
 import requests
@@ -28,14 +27,11 @@ class BaseAPIClient(ABC):
             response.raise_for_status()
 
             try:
-                response_data = response.json()
-                if isinstance(response_data, list):
-                    return {"results": response_data}
-                return response_data
+                return response.json()
 
-            except json.JSONDecodeError:
+            except requests.exceptions.JSONDecodeError:
                 if not response.content:
-                    return 'success'
+                    return ' '
                 return response.content
 
         except requests.exceptions.RequestException as e:

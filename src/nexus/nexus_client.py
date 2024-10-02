@@ -103,12 +103,32 @@ class NexusClient:
         return self.get_request(path)
 
     def find_professional_by_query(self, query):
-        path = "api/core/mobile/randers/v2/professionals/?query=" + query
-        return self.get_request(path)
+        home = self.home_resource()
+
+        if home:
+            {'query': query}
+            professionals_link = home['_links']['professionals']['href']
+            return self.get_request(professionals_link, params={'query': query})
+        # path = "api/core/mobile/randers/v2/professionals/?query=" + query
+        # return self.get_request(path)
+
+    def find_external_professional_by_query(self, query):
+        home = self.home_resource()
+
+        if home:
+            {'query': query}
+            professionals_link = home['_links']['professionals']['href']
+            return self.get_request(professionals_link, params={'query': query})
 
     def find_patient_by_query(self, query):
-        path = "api/core/mobile/randers/v2/patients/?query=" + query
-        return self.api_client.get(path)
+        home = self.home_resource()
+
+        if home:
+            {'query': query}
+            professionals_link = home['_links']['patients']['href']
+            return self.get_request(professionals_link, params={'query': query})
+        # path = "api/core/mobile/randers/v2/patients/?query=" + query
+        # return self.api_client.get(path)
 
     def fetch_patient_by_query(self, query):
         try:
@@ -182,8 +202,8 @@ class NexusClient:
         except Exception as e:
             logger.error(f"Error in fetching dashboard: {e}")
 
-    def get_request(self, path):
-        return self.api_client.get(path)
+    def get_request(self, path, params=None):
+        return self.api_client.get(path, params)
 
     def post_request(self, path, data=None, json=None):
         return self.api_client.post(path, data, json)

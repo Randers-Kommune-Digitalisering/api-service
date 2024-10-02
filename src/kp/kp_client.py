@@ -1,11 +1,11 @@
+import time
 import logging
 import requests
-import json
 from typing import Dict, Tuple
 
 from requests.auth import HTTPBasicAuth
 from base_api_client import BaseAPIClient
-from utils.config import KP_URL, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
+from utils.config import KP_URL, BROWSERLESS_URL, BROWSERLESS_CLIENT_ID, BROWSERLESS_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ class KPAPIClient(BaseAPIClient):
         self.password = password
         self.session_cookie = None
         self.auth_attempted = False
+        self.is_fetching_token = False
 
     @classmethod
     def get_client(cls, username, password):
@@ -30,103 +31,140 @@ class KPAPIClient(BaseAPIClient):
         return client
 
     def request_session_token(self):
-        login_url = self.base_url
-        url = "https://browserless.prototypes.randers.dk/function"
-        headers = {
-            "Content-Type": "application/javascript",
+        self.is_fetching_token = True
+        try:
+            login_url = self.base_url
+            url = f"{BROWSERLESS_URL.rstrip('/')}/function"
+            headers = {
+                "Content-Type": "application/javascript",
 
-        }
-        data = """
-        module.exports = async ({page}) => {
-          // Go to the specific URL
-          await page.goto('""" + f"{login_url}" + """', { waitUntil: 'networkidle2' });
+            }
+            data = """
+            module.exports = async ({page}) => {
+            // Go to the specific URL
+            await page.goto('""" + f"{login_url}" + """', { waitUntil: 'networkidle2' });
 
-          // Log in console when loaded
-          console.log("Page loaded");
+            // Log in console when loaded
+            console.log("Page loaded");
 
-          // Wait for the dropdown to be available
-          await page.waitForSelector('#SelectedAuthenticationUrl');
+            // Wait for the dropdown to be available
+            await page.waitForSelector('#SelectedAuthenticationUrl');
 
-          // Find the option element with the specified text
-          const option = (await page.$x(
-            '//*[@id = "SelectedAuthenticationUrl"]/option[contains(text(), "Randers Kommune")]'
-          ))[0];
+            // Find the option element with the specified text
+            const option = (await page.$x(
+                '//*[@id = "SelectedAuthenticationUrl"]/option[contains(text(), "Randers Kommune")]'
+            ))[0];
 
-          // Check if the option was found
-          if (option) {
-            // Get the value attribute of the option
-            const valueHandle = await option.getProperty('value');
-            const value = await valueHandle.jsonValue(); // Ensure value is a string
+            // Check if the option was found
+            if (option) {
+                // Get the value attribute of the option
+                const valueHandle = await option.getProperty('value');
+                const value = await valueHandle.jsonValue(); // Ensure value is a string
 
-            // Select the option by its value
-            await page.select('#SelectedAuthenticationUrl', value);
+                // Select the option by its value
+                await page.select('#SelectedAuthenticationUrl', value);
 
-            // Wait for some time after selection
-            await page.waitForTimeout(2000); // Adjust the timeout as necessary
+                // Wait for some time after selection
+                await page.waitForTimeout(2000); // Adjust the timeout as necessary
 
-            // Click the button with class "button"
-            await page.click('input.button'); // Since it's an input with class "button"
+                // Click the button with class "button"
+                await page.click('input.button'); // Since it's an input with class "button"
 
-            // Log a message indicating the button was clicked
-            console.log("Button clicked and navigation completed");
+                // Log a message indicating the button was clicked
+                console.log("Button clicked and navigation completed");
 
-            // Wait for the username input field to be available
-            await page.waitForSelector('#userNameInput');
+                // Wait for the username input field to be available
+                await page.waitForSelector('#userNameInput');
 
-            // Type the username
-            await page.type('#userNameInput', '""" + f"{self.username}" + """'); // Replace with your actual username
+                // Type the username
+                await page.type('#userNameInput', '""" + f"{self.username}" + """'); // Replace with your actual username
 
-            // Wait for the password input field to be available
-            await page.waitForSelector('#passwordInput');
+                // Wait for the password input field to be available
+                await page.waitForSelector('#passwordInput');
 
-            // Type the password
-            await page.type('#passwordInput', '""" + f"{self.password}" + """'); // Replace with your actual password
+                // Type the password
+                await page.type('#passwordInput', '""" + f"{self.password}" + """'); // Replace with your actual password
 
-            // Click the submit button
-            await page.click('#submitButton');
+                // Click the submit button
+                await page.click('#submitButton');
 
-            // Log a message indicating the login was attempted
-            console.log("Login attempted");
+                // Log a message indicating the login was attempted
+                console.log("Login attempted");
 
-            // Wait for some time after selection
-            await page.waitForTimeout(2000); // Adjust the timeout as necessary
+                // Wait for some time after selection
+                await page.waitForTimeout(2000); // Adjust the timeout as necessary
 
-            // Retrieve cookies after the login
-            const cookies = await page.cookies();
+                // Retrieve cookies after the login
+                const cookies = await page.cookies();
 
-            // Print the cookies
-            console.log('Cookies after login:', cookies);
-            return {
-              data: {
-                cookies
-              },
-              type: 'application/json'
-            };
-          } else {
-            console.error('Option not found');
-          }
-        }
-        """
-        response = requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID,
-                                                                                     password=BROWSERLESS_CLIENT_SECRET))
-        # Parse the JSON response
-        data = json.loads(response.content)
+                // Print the cookies
+                console.log('Cookies after login:', cookies);
+                return {
+                data: {
+                    cookies
+                },
+                type: 'application/json'
+                };
+            } else {
+                console.error('Option not found');
+            }
+            }
+            """
+            try:
+                response = requests.post(url, headers=headers, data=data,
+                                         auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID, password=BROWSERLESS_CLIENT_SECRET), timeout=180)
+            except requests.exceptions.RequestException as e:
+                logger.error("Failed to fetch a response from Browserless: %s", e)
 
-        # Initialize session_cookie
-        session_cookie = None
+            # Parse the JSON response
+            try:
+                data = response.json()
+            except requests.exceptions.JSONDecodeError as e:
+                logger.error("Failed to parse JSON response from Browserless: %s", e)
 
-        # Loop through the cookies to find the JSESSIONID
-        for cookie in data['cookies']:
-            if cookie['name'] == 'JSESSIONID':
-                session_cookie = cookie['value']
-                break
-        self.session_cookie = session_cookie
-        return session_cookie
+            # Initialize session_cookie
+            session_cookie = None
+
+            # Loop through the cookies to find the JSESSIONID
+            for cookie in data['cookies']:
+                if cookie['name'] == 'JSESSIONID':
+                    session_cookie = cookie['value']
+                    break
+
+            self.session_cookie = session_cookie
+            self.is_fetching_token = False
+            return self.session_cookie
+
+        except Exception as e:
+            logger.error(e)
+            self.is_fetching_token = False
+            return None
 
     def authenticate(self):
+        timeout = time.time() + 180   # 3 minutes timeout
+        while self.is_fetching_token:
+            if time.time() > timeout:
+                break
         if self.session_cookie:
             return self.session_cookie
         return self.request_session_token()
+
+    def reauthenticate(self):
+        if self.is_fetching_token:
+            timeout = time.time() + 180   # 3 minutes timeout
+            while self.is_fetching_token:
+                if time.time() > timeout:
+                    break
+            return self.session_cookie
+        if not self.auth_attempted:
+            self.auth_attempted = True
+            auth = self.request_session_token()
+            if auth:
+                return auth
+        else:
+            self.auth_attempted = False
+            logger.error("Fetching new session token failed.")
+        return False
 
     def get_auth_headers(self):
         session_cookie = self.authenticate()
@@ -136,34 +174,49 @@ class KPAPIClient(BaseAPIClient):
     def _make_request(self, method, path, **kwargs):
         # Override _make_request to handle specific behavior for KPAPIClient
         try:
-            response = super()._make_request(method, path, **kwargs)
-            headers = response.get('Headers', {})
-            if headers:
-                content_type = headers.get('Content-Type', '')
+            headers = self.get_auth_headers()
 
-                if 'text/html' in content_type.lower():
-                    if not self.auth_attempted:
-                        logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
-                        self.authenticate()  # Attempt to fetch new session token
-                        headers = self.get_headers()  # Update headers with new session token
-                        self.auth_attempted = True
-                        return method(path, headers=headers, **kwargs)  # Retry the request
+            if path.startswith("http://") or path.startswith("https://"):
+                url = path
+            else:
+                url = f"{self.base_url}/{path}"
 
-                    if self.auth_attempted:
-                        self.auth_attempted = False
-                        logger.warning("Fetching new session token failed")
-            return response
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 401 and self.auth_attempted is False:
-                logger.info("Received 401 Unauthorized, attempting to fetch new session token...")
-                self.authenticate()  # Attempt to fetch new session token
-                headers = self.get_auth_headers()  # Update headers with new session token
-                self.auth_attempted = True
-                return method(path, headers=headers, **kwargs)  # Retry the request
-            elif e.response.status_code == 401 and self.auth_attempted is True:
-                self.auth_attempted = False
-                logger.warning("Fetching new session token failed")
-                return None
+            try:
+                response = method(url, headers=headers, **kwargs)
+                response.raise_for_status()
+
+                if 'text/html' in response.headers.get('Content-Type', '').lower():  # Check if response is HTML
+                    retry_authenticate = self.reauthenticate()  # Attempt to fetch new session token
+                    if retry_authenticate:
+                        return self._make_request(method, path, **kwargs)  # Retry the request
+                    else:
+                        return None
+
+                try:
+                    json = response.json()
+                    self.auth_attempted = False
+                    return json
+
+                except requests.exceptions.JSONDecodeError:  # Handle JSON decoding errors
+                    self.auth_attempted = False
+                    if not response.content:
+                        return ' '
+                    return response.content
+
+            except requests.exceptions.HTTPError as e:  # Handle HTTP errors
+                if e.response.status_code == 401 or (e.response.status_code == 500 and b'AccessDeniedException' in e.response.content):
+                    retry_authenticate = self.reauthenticate()  # Attempt to fetch new session token
+                    if retry_authenticate:
+                        return self._make_request(method, path, **kwargs)  # Retry the request
+                    else:
+                        return None
+                else:
+                    logger.error(e)
+                    return None
+
+        except Exception as e:
+            logger.error(e)
+            return None
 
 
 class KPClient:
@@ -201,15 +254,12 @@ class KPClient:
 
     def get_personal_supplement(self, id: str):
         path = f"rest/api/person/history/{id}/personligTillaegsprocent"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
 
     def get_health_supplement(self, id: str):
         path = f"rest/api/person/history/{id}/helbredstillaegsprocent"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
 
     def get_special_information(self, id: str):
         path = f"rest/api/warning/person/{id}"
-        response = self.api_client.get(path)
-        return response
+        return self.api_client.get(path)
