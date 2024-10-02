@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 class KPAPIClient(BaseAPIClient):
     _client_cache: Dict[Tuple[str, str], 'KPAPIClient'] = {}
-    isFetchingToken = False
 
     def __init__(self, username, password):
         super().__init__(KP_URL)
@@ -20,6 +19,7 @@ class KPAPIClient(BaseAPIClient):
         self.password = password
         self.session_cookie = None
         self.auth_attempted = False
+        self.is_fetching_token = False
 
     @classmethod
     def get_client(cls, username, password):
@@ -31,120 +31,130 @@ class KPAPIClient(BaseAPIClient):
         return client
 
     def request_session_token(self):
-        self.isFetchingToken = True
-        login_url = self.base_url
-        url = f"{BROWSERLESS_URL.rstrip('/')}/function"
-        headers = {
-            "Content-Type": "application/javascript",
-
-        }
-        data = """
-        module.exports = async ({page}) => {
-          // Go to the specific URL
-          await page.goto('""" + f"{login_url}" + """', { waitUntil: 'networkidle2' });
-
-          // Log in console when loaded
-          console.log("Page loaded");
-
-          // Wait for the dropdown to be available
-          await page.waitForSelector('#SelectedAuthenticationUrl');
-
-          // Find the option element with the specified text
-          const option = (await page.$x(
-            '//*[@id = "SelectedAuthenticationUrl"]/option[contains(text(), "Randers Kommune")]'
-          ))[0];
-
-          // Check if the option was found
-          if (option) {
-            // Get the value attribute of the option
-            const valueHandle = await option.getProperty('value');
-            const value = await valueHandle.jsonValue(); // Ensure value is a string
-
-            // Select the option by its value
-            await page.select('#SelectedAuthenticationUrl', value);
-
-            // Wait for some time after selection
-            await page.waitForTimeout(2000); // Adjust the timeout as necessary
-
-            // Click the button with class "button"
-            await page.click('input.button'); // Since it's an input with class "button"
-
-            // Log a message indicating the button was clicked
-            console.log("Button clicked and navigation completed");
-
-            // Wait for the username input field to be available
-            await page.waitForSelector('#userNameInput');
-
-            // Type the username
-            await page.type('#userNameInput', '""" + f"{self.username}" + """'); // Replace with your actual username
-
-            // Wait for the password input field to be available
-            await page.waitForSelector('#passwordInput');
-
-            // Type the password
-            await page.type('#passwordInput', '""" + f"{self.password}" + """'); // Replace with your actual password
-
-            // Click the submit button
-            await page.click('#submitButton');
-
-            // Log a message indicating the login was attempted
-            console.log("Login attempted");
-
-            // Wait for some time after selection
-            await page.waitForTimeout(2000); // Adjust the timeout as necessary
-
-            // Retrieve cookies after the login
-            const cookies = await page.cookies();
-
-            // Print the cookies
-            console.log('Cookies after login:', cookies);
-            return {
-              data: {
-                cookies
-              },
-              type: 'application/json'
-            };
-          } else {
-            console.error('Option not found');
-          }
-        }
-        """
+        self.is_fetching_token = True
         try:
-            response = requests.post(url, headers=headers, data=data,
-                                     auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID, password=BROWSERLESS_CLIENT_SECRET), timeout=180)
-        except requests.exceptions.RequestException as e:
-            logger.error("Failed to fetch a response from Browserless: %s", e)
+            login_url = self.base_url
+            url = f"{BROWSERLESS_URL.rstrip('/')}/function"
+            headers = {
+                "Content-Type": "application/javascript",
 
-        # Parse the JSON response
-        try:
-            data = response.json()
-        except requests.exceptions.JSONDecodeError as e:
-            logger.error("Failed to parse JSON response from Browserless: %s", e)
+            }
+            data = """
+            module.exports = async ({page}) => {
+            // Go to the specific URL
+            await page.goto('""" + f"{login_url}" + """', { waitUntil: 'networkidle2' });
 
-        # Initialize session_cookie
-        session_cookie = None
+            // Log in console when loaded
+            console.log("Page loaded");
 
-        # Loop through the cookies to find the JSESSIONID
-        for cookie in data['cookies']:
-            if cookie['name'] == 'JSESSIONID':
-                session_cookie = cookie['value']
-                break
+            // Wait for the dropdown to be available
+            await page.waitForSelector('#SelectedAuthenticationUrl');
 
-        self.session_cookie = session_cookie
-        self.isFetchingToken = False
-        return self.session_cookie
+            // Find the option element with the specified text
+            const option = (await page.$x(
+                '//*[@id = "SelectedAuthenticationUrl"]/option[contains(text(), "Randers Kommune")]'
+            ))[0];
+
+            // Check if the option was found
+            if (option) {
+                // Get the value attribute of the option
+                const valueHandle = await option.getProperty('value');
+                const value = await valueHandle.jsonValue(); // Ensure value is a string
+
+                // Select the option by its value
+                await page.select('#SelectedAuthenticationUrl', value);
+
+                // Wait for some time after selection
+                await page.waitForTimeout(2000); // Adjust the timeout as necessary
+
+                // Click the button with class "button"
+                await page.click('input.button'); // Since it's an input with class "button"
+
+                // Log a message indicating the button was clicked
+                console.log("Button clicked and navigation completed");
+
+                // Wait for the username input field to be available
+                await page.waitForSelector('#userNameInput');
+
+                // Type the username
+                await page.type('#userNameInput', '""" + f"{self.username}" + """'); // Replace with your actual username
+
+                // Wait for the password input field to be available
+                await page.waitForSelector('#passwordInput');
+
+                // Type the password
+                await page.type('#passwordInput', '""" + f"{self.password}" + """'); // Replace with your actual password
+
+                // Click the submit button
+                await page.click('#submitButton');
+
+                // Log a message indicating the login was attempted
+                console.log("Login attempted");
+
+                // Wait for some time after selection
+                await page.waitForTimeout(2000); // Adjust the timeout as necessary
+
+                // Retrieve cookies after the login
+                const cookies = await page.cookies();
+
+                // Print the cookies
+                console.log('Cookies after login:', cookies);
+                return {
+                data: {
+                    cookies
+                },
+                type: 'application/json'
+                };
+            } else {
+                console.error('Option not found');
+            }
+            }
+            """
+            try:
+                response = requests.post(url, headers=headers, data=data,
+                                         auth=HTTPBasicAuth(username=BROWSERLESS_CLIENT_ID, password=BROWSERLESS_CLIENT_SECRET), timeout=180)
+            except requests.exceptions.RequestException as e:
+                logger.error("Failed to fetch a response from Browserless: %s", e)
+
+            # Parse the JSON response
+            try:
+                data = response.json()
+            except requests.exceptions.JSONDecodeError as e:
+                logger.error("Failed to parse JSON response from Browserless: %s", e)
+
+            # Initialize session_cookie
+            session_cookie = None
+
+            # Loop through the cookies to find the JSESSIONID
+            for cookie in data['cookies']:
+                if cookie['name'] == 'JSESSIONID':
+                    session_cookie = cookie['value']
+                    break
+
+            self.session_cookie = session_cookie
+            self.is_fetching_token = False
+            return self.session_cookie
+
+        except Exception as e:
+            logger.error(e)
+            self.is_fetching_token = False
+            return None
 
     def authenticate(self):
-        while self.isFetchingToken:
-            time.sleep(1)
+        timeout = time.time() + 180   # 3 minutes timeout
+        while self.is_fetching_token:
+            if time.time() > timeout:
+                break
         if self.session_cookie:
             return self.session_cookie
         return self.request_session_token()
 
     def reauthenticate(self):
-        if self.isFetchingToken:
-            while self.isFetchingToken:
-                time.sleep(1)
+        if self.is_fetching_token:
+            timeout = time.time() + 180   # 3 minutes timeout
+            while self.is_fetching_token:
+                if time.time() > timeout:
+                    break
             return self.session_cookie
         if not self.auth_attempted:
             self.auth_attempted = True
