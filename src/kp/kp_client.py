@@ -145,7 +145,6 @@ class KPAPIClient(BaseAPIClient):
         while self.is_fetching_token:
             if time.time() > timeout:
                 break
-            time.sleep(1)
         if self.session_cookie:
             return self.session_cookie
         return self.request_session_token()
@@ -156,7 +155,6 @@ class KPAPIClient(BaseAPIClient):
             while self.is_fetching_token:
                 if time.time() > timeout:
                     break
-                time.sleep(1)
             return self.session_cookie
         if not self.auth_attempted:
             self.auth_attempted = True
