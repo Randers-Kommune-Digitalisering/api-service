@@ -141,7 +141,10 @@ class KPAPIClient(BaseAPIClient):
             return None
 
     def authenticate(self):
+        timeout = time.time() + 180   # 3 minutes timeout
         while self.isFetchingToken:
+            if time.time() > timeout:
+                break
             time.sleep(1)
         if self.session_cookie:
             return self.session_cookie
@@ -149,7 +152,10 @@ class KPAPIClient(BaseAPIClient):
 
     def reauthenticate(self):
         if self.isFetchingToken:
+            timeout = time.time() + 180   # 3 minutes timeout
             while self.isFetchingToken:
+                if time.time() > timeout:
+                    break
                 time.sleep(1)
             return self.session_cookie
         if not self.auth_attempted:
