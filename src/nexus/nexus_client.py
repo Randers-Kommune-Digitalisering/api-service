@@ -117,7 +117,7 @@ class NexusClient:
 
         if home:
             {'query': query}
-            professionals_link = home['_links']['professionals']['href']
+            professionals_link = home['_links']['importProfessionalFromSts']['href']
             return self.get_request(professionals_link, params={'query': query})
 
     def find_patient_by_query(self, query):
