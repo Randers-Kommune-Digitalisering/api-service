@@ -1,32 +1,26 @@
 import re
 import logging
 
-from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID
+from utils.config import DELTA_CERT_BASE64, DELTA_CERT_PASS, DELTA_BASE_URL, DELTA_TOP_ADM_UNIT_UUID, NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL
 from delta import DeltaClient
-from nexus.nexus_client import NEXUSClient, NexusRequest, execute_nexus_flow
+from nexus.nexus_client import NexusClient, NexusRequest, execute_nexus_flow
 
 logger = logging.getLogger(__name__)
-nexus_client = NEXUSClient()
+nexus_client = NexusClient(NEXUS_CLIENT_ID, NEXUS_CLIENT_SECRET, NEXUS_URL)
 delta_client = DeltaClient(cert_base64=DELTA_CERT_BASE64, cert_pass=DELTA_CERT_PASS, base_url=DELTA_BASE_URL, top_adm_org_uuid=DELTA_TOP_ADM_UNIT_UUID)
 
 
 def job():
     try:
-        delta_active_orgs = delta_client.get_adm_org_lists()
-        delta_active_orgs_list = list(delta_active_orgs.keys())
-        for val in delta_active_orgs.values():
-            delta_active_orgs_list.extend(val)
-
-        active_org_list = _fetch_all_active_organisations(delta_active_orgs_list)
+        active_org_list = _fetch_all_active_organisations()
+        all_delta_orgs = delta_client.get_all_organizations()
         employees_changed_list = delta_client.get_employees_changed()
-
         if employees_changed_list:
             logger.info("Employees changed - updating Nexus from external system")
             _sync_orgs_and_users()
-
             for index, employee in enumerate(employees_changed_list):
                 logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
-                execute_brugerauth(active_org_list, employee['user'], employee['organizations'])
+                execute_brugerauth(active_org_list, employee['user'], employee['organizations'], all_delta_orgs)
         else:
             logger.info("No employees changed")
         return True
@@ -35,50 +29,67 @@ def job():
         return False
 
 
-def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list):
+def execute_brugerauth(active_org_list: list, primary_identifier: str, input_organisation_uuid_list: list, all_organisation_uuid_list: list = None):
     professional = _fetch_professional(primary_identifier)
+
     if not professional:
-        logger.error(f"Professional {primary_identifier} not found")
+        logger.info(f"Professional {primary_identifier} not found in Nexus - creating")
+        new_professional = _fetch_external_professional(primary_identifier)
+        if new_professional:
+            professional = nexus_client.post_request(new_professional['_links']['create']['href'], json=new_professional)
+            if professional:
+                logger.info(f"Professional {primary_identifier} created")
+            else:
+                logger.error(f"Failed to create professional {primary_identifier} - skipping")
+                return
+        else:
+            logger.error(f"Professional {primary_identifier} not found in external system - skipping")
+            return
 
     # Get all assigned organisations for professional as list of dicts - [0] being id, [1] being uuid
     professional_org_list = _fetch_professional_org_syncIds(professional)
     # logger.info(f"Professional current organisation: {professional_org_list}")
 
     # uuids from active_org_list not found in input_organisation_uuid_list
-    unassigned_organisation_ids = [item['id'] for item in active_org_list if item['sync_id'] in input_organisation_uuid_list]
-
-    if len(unassigned_organisation_ids) == 0:
-        logger.error(f"No organizations found for professional {primary_identifier}")
+    organisation_ids_to_assign = [item['id'] for item in active_org_list if item['sync_id'] in input_organisation_uuid_list]
 
     # Filter out IDs present in professional_org_list
-    unassigned_organisation_ids = [org_id for org_id in unassigned_organisation_ids if org_id not in [item['id'] for item in professional_org_list]]
+    unassigned_organisation_ids_to_assign = [org_id for org_id in organisation_ids_to_assign if org_id not in [item['id'] for item in professional_org_list]]
 
     # Remove duplicates
-    unassigned_organisation_ids = list(set(unassigned_organisation_ids))
-    # logger.info(f"Professional unassigned organisation: {unassigned_organisation_ids}")
+    unassigned_organisation_ids_to_assign = list(set(unassigned_organisation_ids_to_assign))
+
+    # Get a list of all delta uuid which are not set for the user and get corosponding nexus ids
+    uuids_to_remove = list(set(all_organisation_uuid_list) - set(input_organisation_uuid_list))
+    organisation_ids_to_remove = [item['id'] for item in active_org_list if item['sync_id'] in uuids_to_remove]
+
+    # Filter out IDs not present in professional_org_list and remove duplicates
+    assigned_organisation_ids_to_remove = [org_id for org_id in organisation_ids_to_remove if org_id in [item['id'] for item in professional_org_list]]
+    assigned_organisation_ids_to_remove = list(set(assigned_organisation_ids_to_remove))
 
     try:
-        if len(unassigned_organisation_ids) > 0:
+        if len(unassigned_organisation_ids_to_assign) > 0 or len(assigned_organisation_ids_to_remove) > 0:
             # Update the organisations for the professional
-            if _update_professional_organisations(professional, unassigned_organisation_ids):
+            if _update_professional_organisations(professional, unassigned_organisation_ids_to_assign, assigned_organisation_ids_to_remove):
                 logger.info(f'Professional {primary_identifier} updated with organisations')
             else:
                 logger.error(f'Failed to update professional {primary_identifier} with organisations')
         else:
-            logger.info(f'Professional {primary_identifier} already has all organisations - not updating')
+            logger.info(f'Professional {primary_identifier} already has correct organisations assigned - not updating')
 
         # Get top organisation's supplier
-        current = next((item for item in active_org_list if item['sync_id'] == input_organisation_uuid_list[0]), None)
-        supplier = current.get('supplier')
+        if input_organisation_uuid_list:
+            current = next((item for item in active_org_list if item['sync_id'] == input_organisation_uuid_list[0]), None)
+            supplier = current.get('supplier')
 
-        # If it has a supplier update it
-        if supplier:
-            if _update_professional_supplier(professional, supplier, primary_identifier):
-                logger.info(f"Professional {primary_identifier} updated with supplier")
+            # If it has a supplier update it
+            if supplier:
+                if _update_professional_supplier(professional, supplier, primary_identifier):
+                    logger.info(f"Professional {primary_identifier} updated with supplier")
+                else:
+                    logger.error(f"Failed to update professional {primary_identifier} with supplier")
             else:
-                logger.error(f"Failed to update professional {primary_identifier} with supplier")
-        else:
-            logger.info(f'Top organisation for professional {primary_identifier} has a  no supplier - not updating')
+                logger.info(f'Top organisation for professional {primary_identifier} has a  no supplier - not updating')
 
         logger.info(f'Professional {primary_identifier} updated sucessfully')
     except Exception as e:
@@ -91,14 +102,31 @@ def _fetch_professional(primary_identifier):
         return nexus_client.find_professional_by_query(primary_identifier)[0]
 
 
-def _update_professional_organisations(professional, organisation_id_list):
+def _fetch_external_professional(primary_identifier):
+    res = nexus_client.find_external_professional_by_query(primary_identifier)
+    if res:
+        if 'reason' in res:
+            if res['reason'] == 'ProfessionalWithStsSnNotFetched':
+                return None
+            else:
+                raise Exception(f"Error fetching external professional: {res}")
+        else:
+            res['primaryIdentifier'] = primary_identifier
+            res['primaryAddress']['route'] = 'home:importProfessionalFromSts'
+            res['activeDirectoryConfiguration']['route'] = 'home:importProfessionalFromSts'
+            return res
+    else:
+        logger.error(f"Error fetching external professional: {res}")
+
+
+def _update_professional_organisations(professional, organisation_ids_to_add, organisation_ids_to_remove):
     # Proffesional self
     request1 = NexusRequest(input_response=professional, link_href="self", method="GET")
 
     # json body with the list of organisation ids that should be added to the professional
     json_body = {
-        "added": organisation_id_list,
-        "removed": []
+        "added": organisation_ids_to_add,
+        "removed": organisation_ids_to_remove
     }
 
     # Proffesional organisations
