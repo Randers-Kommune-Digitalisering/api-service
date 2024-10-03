@@ -7,7 +7,7 @@ import threading
 import collections
 import requests_pkcs12
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +203,7 @@ class DeltaClient:
         return [item for key, values in self.get_adm_org_list().items() for item in [key] + values]
 
     # Returns a list of dictionaries with key 'user' containing DQ-numberand key 'organizations' containing a list of UUIDs for organizations they need access to
-    def get_employees_changed(self, time_back_minutes=30):
+    def get_employees_changed(self, time_back_days=30):
         try:
             adm_org_units_with_employees = self.get_adm_org_list()
             if not adm_org_units_with_employees:
@@ -213,8 +213,8 @@ class DeltaClient:
             payload_changes = self._get_payload('employee_changes')
 
             # Delta uses UTC time
-            time_back_minutes = timedelta(minutes=time_back_minutes)
-            from_time = (datetime.now(tz=timezone.utc) - time_back_minutes).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
+            time_back_days = timedelta(days=time_back_days)
+            from_time = (datetime.now(tz=timezone.utc) - time_back_days).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
             to_time = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
 
             payload_changes_with_params = self._set_params(payload_changes, {'fromTime': from_time, "toTime": to_time})
@@ -226,26 +226,41 @@ class DeltaClient:
             json_res = r.json()
             employee_changed_list = []
 
+            # Function to parse the from date
+            def get_from_date(employee_change):
+                return datetime.strptime(employee_change['validityInterval']['from'], '%Y-%m-%d')
+
             # If any changes
             if len(json_res['queryResultList'][0]['registrationList']) > 0:
                 # Iterate over changes
                 for change in json_res['queryResultList'][0]['registrationList']:
+                    # Adm. org. unit changes
                     if len(change['typeRefBiList']) > 0:
-                        # If change to admin unit
-                        if change['typeRefBiList'][0]['value']['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
-                            # if admin unit is relevant (on the list)
-                            if change['typeRefBiList'][0]["value"]["refObjIdentity"]['uuid'] in adm_org_units_with_employees.keys():
-                                changes_list.append({'employee': change['objectUuid'], 'admunit': change['typeRefBiList'][0]["value"]["refObjIdentity"]['uuid'], 'time': datetime.strptime(change['regDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ')})
+                        filtered_ec = [ec for ec in change['typeRefBiList'] if ec['value']['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit' and ec["value"]["refObjIdentity"]['uuid'] in adm_org_units_with_employees.keys()]
+                        ec = max(filtered_ec, key=get_from_date, default=None)
+                        # Changed to an admin unit with employees
+                        if ec:
+                            changes_list.append({'employee': change['objectUuid'], 'admunit': ec["value"]["refObjIdentity"]['uuid'], 'regDateTime': datetime.strptime(change['regDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ'), 'validityDate': datetime.strptime(change['validityDate'], '%Y-%m-%d')})
+
+                    # State inactive changes -TODO: Is this needed?
+                    # if len(change['closedStateBiList']) > 0:
+                    #     ec = max(change['closedStateBiList'], key=get_from_date, default=None)
+                    #     if ec:
+                    #         changes_list.append({'employee': change['objectUuid'], 'regDateTime': datetime.strptime(change['regDateTime'], '%Y-%m-%dT%H:%M:%S.%fZ'), 'validityDate': datetime.strptime(change['validityDate'], '%Y-%m-%d')})
 
             # Split _list into a list of lists (for each employee)
             by_employee = collections.defaultdict(list)
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            
             for d in changes_list:
-                by_employee[d['employee']].append(d)
+                # Only keep changes that are valid today or in the past
+                if d['validityDate'] <= today:
+                    by_employee[d['employee']].append(d)
 
             # Only keep the lastest for each employee
             employee_list = []
             for same_employee_list in list(by_employee.values()):
-                same_employee_list = sorted(same_employee_list, key=lambda x: x['time'], reverse=True)
+                same_employee_list = sorted(same_employee_list, key=lambda x: x['validityDate'], reverse=True)
                 same_employee_list = [same_employee_list[0]] if same_employee_list else []
                 employee_list.extend(same_employee_list)
 
@@ -254,28 +269,31 @@ class DeltaClient:
                 for employee in employee_list:
                     dq_number = None
                     employment_type = None
+                    current_adm_unit = None
                     payload_employee_with_params = self._set_params(payload_employee, {'uuid': employee['employee']})
                     r = self._make_post_request(payload_employee_with_params)
                     r.raise_for_status()
                     json_res = r.json()
                     if len(json_res['queryResults'][0]['instances']) > 0:
                         first_res = json_res['queryResults'][0]['instances'][0]
-                        # Check employee is active
+                        # Check employee is active - TODO: should also get inactive employees, they need to be set inactive in Nexus
                         if first_res['state'] == 'STATE_ACTIVE' and len(first_res['typeRefs']) > 0:
                             for relation in first_res['typeRefs']:
                                 if relation['userKey'] == 'APOS-Types-Engagement-TypeRelation-AdmUnit':
-                                    # Check if relation to admin unit is correct
-                                    if relation['refObjIdentity']['uuid'] == employee['admunit']:
-                                        if len(first_res["inTypeRefs"]) > 0:
-                                            for ref in first_res["inTypeRefs"]:
-                                                if ref['refObjTypeUserKey'] == 'APOS-Types-User':
-                                                    dq_number = ref['refObjIdentity']['userKey']
+                                    current_adm_unit = relation['refObjIdentity']['uuid']
+                                    if len(first_res["inTypeRefs"]) > 0:
+                                        for ref in first_res["inTypeRefs"]:
+                                            if ref['refObjTypeUserKey'] == 'APOS-Types-User':
+                                                dq_number = ref['refObjIdentity']['userKey']
                                 elif relation['userKey'] == 'APOS-Types-Engagement-TypeRelation-Position':
                                     employment_type = relation['refObjIdentity']['userKey']
 
                     if dq_number and employment_type in employments_to_import:
                         # Add employee to dictionary with key DQ number and value admin unit UUID
-                        employee_changed_list.append({'user': dq_number, 'organizations': [employee['admunit']] + adm_org_units_with_employees[employee['admunit']]})
+                        if current_adm_unit in adm_org_units_with_employees.keys():
+                            employee_changed_list.append({'user': dq_number, 'organizations': [employee['admunit']] + adm_org_units_with_employees[employee['admunit']]})
+                        else:
+                            employee_changed_list.append({'user': dq_number, 'organizations': []})
 
             logger.info(f'Employees with changes {len(employee_changed_list)}')
             logger.info(f'Got employee changes in {str(timedelta(seconds=(time.time() - start)))}')
