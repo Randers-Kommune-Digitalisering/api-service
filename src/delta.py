@@ -7,7 +7,7 @@ import threading
 import collections
 import requests_pkcs12
 
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +251,7 @@ class DeltaClient:
             # Split _list into a list of lists (for each employee)
             by_employee = collections.defaultdict(list)
             today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            
+
             for d in changes_list:
                 # Only keep changes that are valid today or in the past
                 if d['validityDate'] <= today:
