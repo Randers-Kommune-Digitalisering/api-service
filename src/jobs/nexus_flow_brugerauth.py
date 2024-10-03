@@ -16,13 +16,13 @@ def job():
         all_delta_orgs = delta_client.get_all_organizations()
         employees_changed_list = delta_client.get_employees_changed()
         if employees_changed_list:
-          logger.info("Employees changed - updating Nexus from external system")
-          _sync_orgs_and_users()
-          for index, employee in enumerate(employees_changed_list):
-              logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
-              execute_brugerauth(active_org_list, employee['user'], employee['organizations'], all_delta_orgs)
+            logger.info("Employees changed - updating Nexus from external system")
+            _sync_orgs_and_users()
+            for index, employee in enumerate(employees_changed_list):
+                logger.info(f"Processing employee {index + 1}/{len(employees_changed_list)}")
+                execute_brugerauth(active_org_list, employee['user'], employee['organizations'], all_delta_orgs)
         else:
-          logger.info("No employees changed")
+            logger.info("No employees changed")
         return True
     except Exception as e:
         logger.error(f"Error in job: {e}")
